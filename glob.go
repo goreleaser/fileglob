@@ -10,15 +10,32 @@ import (
 	"github.com/spf13/afero"
 )
 
-func Glob(pattern string) ([]string, error) {
-	return GlobWithFs(afero.NewOsFs(), pattern)
+// Options allowed to be passed to Glob.
+type Options struct {
+	fs        afero.Fs
+	quoteMeta bool
 }
 
-func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
-	var matches []string
+// WithFs allows to provide another afero.Fs implementation to Glob.
+func WithFs(fs afero.Fs) Options {
+	return Options{fs: fs}
+}
+
+// QuoteMetaOnly disable globling and only quotes meta characters instead.
+func QuoteMetaOnly() Options {
+	return Options{quoteMeta: true}
+}
+
+// Glob returns all files that match the given pattern in the current directory.
+func Glob(pattern string, opts ...Options) ([]string, error) {
+	var options = compileOptions(opts)
 
 	pattern = strings.TrimPrefix(pattern, "./")
-	matcher, err := glob.Compile(pattern)
+
+	var fs = options.fs
+	var matches []string
+
+	matcher, err := glob.Compile(pattern, filepath.Separator)
 	if err != nil {
 		return matches, err
 	}
@@ -72,6 +89,21 @@ func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
 
 		return nil
 	})
+}
+
+func compileOptions(opts []Options) Options {
+	var options = Options{
+		fs: afero.NewOsFs(),
+	}
+	for _, opt := range opts {
+		if opt.fs != nil {
+			options.fs = opt.fs
+		}
+		if opt.quoteMeta {
+			options.quoteMeta = true
+		}
+	}
+	return options
 }
 
 func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {

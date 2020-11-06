@@ -122,7 +122,7 @@ func globInMemoryFs(pattern string, files []string) ([]string, error) {
 	if err := createFiles(fs, files); err != nil {
 		return []string{}, err
 	}
-	return GlobWithFs(fs, pattern)
+	return Glob(pattern, WithFs(fs))
 }
 
 func createFiles(fs afero.Fs, files []string) error {

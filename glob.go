@@ -3,7 +3,6 @@ package zglob
 import (
 	"fmt"
 	"os"
-	"path"
 
 	"github.com/gobwas/glob"
 	"github.com/spf13/afero"
@@ -51,20 +50,20 @@ func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
 			return err
 		}
 
-		if !matcher.Match(info.Name()) {
+		if !matcher.Match(currentPath) {
 			return nil
 		}
 
 		if info.IsDir() {
 			// a direct match on a directory implies that all files inside match
-			filesInDir, err := filesInDirectory(fs, path.Join(currentPath, info.Name()))
+			filesInDir, err := filesInDirectory(fs, currentPath)
 			if err != nil {
 				return err
 			}
 
 			matches = append(matches, filesInDir...)
 		} else {
-			matches = append(matches, path.Join(currentPath, info.Name()))
+			matches = append(matches, currentPath)
 		}
 
 		return nil
@@ -83,7 +82,7 @@ func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {
 			return nil
 		}
 
-		files = append(files, path.Join(currentPath, info.Name()))
+		files = append(files, currentPath)
 
 		return nil
 	})

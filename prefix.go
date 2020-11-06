@@ -2,7 +2,6 @@ package zglob
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -46,7 +45,7 @@ func staticPrefix(pattern string) (string, error) {
 			break
 		}
 
-		prefix = path.Join(prefix, v.Text)
+		prefix = filepath.Join(prefix, v.Text)
 	}
 
 	if prefix == "" {

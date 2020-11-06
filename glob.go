@@ -26,7 +26,7 @@ func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
 		return nil, fmt.Errorf("determine static prefix: %w", err)
 	}
 
-	prefixInfo, err := os.Stat(prefix)
+	prefixInfo, err := fs.Stat(prefix)
 	if os.IsNotExist(err) {
 		// if the prefix does not exist, the whole
 		// glob pattern won't match anything

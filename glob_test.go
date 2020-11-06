@@ -47,7 +47,6 @@ func TestGlob(t *testing.T) {
 		require.Equal(t, []string{
 			"a/b/file1.txt",
 			"a/d/file1.txt",
-			"a/e/f",
 			"a/e/f/file1.txt",
 		}, matches)
 	})

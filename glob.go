@@ -3,6 +3,7 @@ package zglob
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/gobwas/glob"
 	"github.com/spf13/afero"
@@ -15,6 +16,7 @@ func Glob(pattern string) ([]string, error) {
 func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
 	var matches []string
 
+	pattern = strings.TrimPrefix(pattern, "./")
 	matcher, err := glob.Compile(pattern)
 	if err != nil {
 		return matches, err
@@ -30,7 +32,8 @@ func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
 		// if the prefix does not exist, the whole
 		// glob pattern won't match anything
 		return []string{}, nil
-	} else if err != nil {
+	}
+	if err != nil {
 		return nil, fmt.Errorf("stat prefix: %w", err)
 	}
 
@@ -44,26 +47,25 @@ func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
 		return []string{}, nil
 	}
 
-	return matches, afero.Walk(fs, prefix, func(currentPath string, info os.FileInfo,
-		err error) error {
+	return matches, afero.Walk(fs, prefix, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if !matcher.Match(currentPath) {
+		if !matcher.Match(path) {
 			return nil
 		}
 
 		if info.IsDir() {
 			// a direct match on a directory implies that all files inside match
-			filesInDir, err := filesInDirectory(fs, currentPath)
+			filesInDir, err := filesInDirectory(fs, path)
 			if err != nil {
 				return err
 			}
 
 			matches = append(matches, filesInDir...)
 		} else {
-			matches = append(matches, currentPath)
+			matches = append(matches, path)
 		}
 
 		return nil
@@ -71,7 +73,7 @@ func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
 }
 
 func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {
-	files := []string{}
+	var files []string
 
 	err := afero.Walk(fs, dir, func(currentPath string, info os.FileInfo, err error) error {
 		if err != nil {

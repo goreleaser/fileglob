@@ -1,4 +1,4 @@
-module github.com/goreleaser/zglob
+module github.com/goreleaser/fileglob
 
 go 1.15
 

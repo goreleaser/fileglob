@@ -1,1 +1,7 @@
-# zglob2
+# fileglob
+
+## What
+
+## Why
+
+## vs Other libraries

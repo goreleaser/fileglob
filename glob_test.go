@@ -1,4 +1,4 @@
-package zglob
+package fileglob
 
 import (
 	"testing"

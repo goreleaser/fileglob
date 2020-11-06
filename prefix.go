@@ -10,6 +10,8 @@ import (
 	"github.com/gobwas/glob/syntax/lexer"
 )
 
+// staticPrefix returns the filepath up to the
+// first path element that contains a wildcard.
 func staticPrefix(pattern string) (string, error) {
 	parts := strings.Split(pattern, string(filepath.Separator))
 

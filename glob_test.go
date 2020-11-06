@@ -69,6 +69,15 @@ func TestGlob(t *testing.T) {
 		require.Equal(t, []string{"a/b/c"}, matches)
 	})
 
+	t.Run("direct no match", func(t *testing.T) {
+		matches, err := globInMemoryFs("a/b/d", []string{
+			"./a/nope.txt",
+			"./a/b/dc",
+		})
+		require.NoError(t, err)
+		require.Equal(t, []string{}, matches)
+	})
+
 	t.Run("no matches", func(t *testing.T) {
 		matches, err := globInMemoryFs("z/*", []string{
 			"./a/nope.txt",

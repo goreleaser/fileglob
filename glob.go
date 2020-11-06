@@ -25,7 +25,7 @@ func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
 
 	prefix, err := staticPrefix(pattern)
 	if err != nil {
-		return nil, fmt.Errorf("determine static prefix: %w", err)
+		return nil, fmt.Errorf("cannot determine static prefix: %w", err)
 	}
 
 	prefixInfo, err := fs.Stat(prefix)

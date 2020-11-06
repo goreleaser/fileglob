@@ -9,8 +9,8 @@ import (
 	"github.com/gobwas/glob/syntax/lexer"
 )
 
-// staticPrefix returns the filepath up to the
-// first path element that contains a wildcard.
+// staticPrefix returns the file path inside the pattern up
+// to the first path element that contains a wildcard.
 func staticPrefix(pattern string) (string, error) {
 	parts := strings.Split(pattern, string(filepath.Separator))
 
@@ -32,6 +32,7 @@ func staticPrefix(pattern string) (string, error) {
 		nChildren := len(rootNode.Children)
 
 		if nChildren > 1 {
+			// this pattern is not static
 			break
 		}
 

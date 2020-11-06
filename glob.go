@@ -77,19 +77,14 @@ func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
 func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {
 	var files []string
 
-	err := afero.Walk(fs, dir, func(currentPath string, info os.FileInfo, err error) error {
+	return files, afero.Walk(fs, dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-
 		if info.IsDir() {
 			return nil
 		}
-
-		files = append(files, currentPath)
-
+		files = append(files, path)
 		return nil
 	})
-
-	return files, err
 }

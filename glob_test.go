@@ -8,6 +8,15 @@ import (
 )
 
 func TestGlob(t *testing.T) {
+	t.Run("real", func(t *testing.T) {
+		matches, err := Glob("*_test.go")
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			"glob_test.go",
+			"prefix_test.go",
+		}, matches)
+	})
+
 	t.Run("simple", func(t *testing.T) {
 		matches, err := globInMemoryFs("./a/*/*", []string{
 			"./c/file1.txt",
@@ -49,6 +58,15 @@ func TestGlob(t *testing.T) {
 			"a/d/file1.txt",
 			"a/e/f/file1.txt",
 		}, matches)
+	})
+
+	t.Run("direct match", func(t *testing.T) {
+		matches, err := globInMemoryFs("a/b/c", []string{
+			"./a/nope.txt",
+			"./a/b/c",
+		})
+		require.NoError(t, err)
+		require.Equal(t, []string{"a/b/c"}, matches)
 	})
 
 	t.Run("no matches", func(t *testing.T) {

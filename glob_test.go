@@ -64,6 +64,30 @@ func TestGlob(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, matches)
 	})
+
+	t.Run("escaped asterisk", func(t *testing.T) {
+		matches, err := globInMemoryFs("a/\\*/b", []string{
+			"a/a/b",
+			"a/*/b",
+			"a/**/b",
+		})
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			"a/*/b",
+		}, matches)
+	})
+
+	t.Run("escaped curly braces", func(t *testing.T) {
+		matches, err := globInMemoryFs("\\{a,b\\}/c", []string{
+			"a/c",
+			"b/c",
+			"{a,b}/c",
+		})
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			"{a,b}/c",
+		}, matches)
+	})
 }
 
 func globInMemoryFs(pattern string, files []string) ([]string, error) {

@@ -3,6 +3,7 @@ package zglob
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gobwas/glob"
@@ -64,6 +65,7 @@ func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
 			}
 
 			matches = append(matches, filesInDir...)
+			return filepath.SkipDir
 		} else {
 			matches = append(matches, path)
 		}

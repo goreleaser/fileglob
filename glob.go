@@ -69,20 +69,7 @@ func Glob(pattern string, opts ...Options) ([]string, error) {
 			return err
 		}
 
-		if !matcher.Match(path) {
-			return nil
-		}
-
-		if info.IsDir() {
-			// a direct match on a directory implies that all files inside match
-			filesInDir, err := filesInDirectory(fs, path)
-			if err != nil {
-				return err
-			}
-
-			matches = append(matches, filesInDir...)
-			return filepath.SkipDir
-		} else {
+		if matcher.Match(path) && !info.IsDir() {
 			matches = append(matches, path)
 		}
 
@@ -100,19 +87,4 @@ func compileOptions(opts []Options) Options {
 		}
 	}
 	return options
-}
-
-func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {
-	var files []string
-
-	return files, afero.Walk(fs, dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		files = append(files, path)
-		return nil
-	})
 }

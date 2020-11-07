@@ -115,6 +115,21 @@ func TestGlob(t *testing.T) {
 			"{a,b}/c",
 		}, matches)
 	})
+
+	t.Run("pattern ending with star and subdir", func(t *testing.T) {
+		matches, err := globInMemoryFs("a/*", []string{
+			"./a/1.txt",
+			"./a/2.txt",
+			"./a/3.txt",
+			"./a/b/4.txt",
+		})
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			"a/1.txt",
+			"a/2.txt",
+			"a/3.txt",
+		}, matches)
+	})
 }
 
 func TestQuoteMeta(t *testing.T) {

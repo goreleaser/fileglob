@@ -30,7 +30,7 @@ jobs:
       - name: Dependencies
         run: go mod tidy
       - name: Test
-          run: go test -v -failfast -race -coverpkg=./... -covermode=atomic -coverprofile=coverage.txt ./...
+        run: go test -v -failfast -race -coverpkg=./... -covermode=atomic -coverprofile=coverage.txt ./...
       - name: Upload coverage
         uses: codecov/codecov-action@v1
         with:

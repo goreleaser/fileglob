@@ -64,15 +64,10 @@ func Glob(pattern string, opts ...Options) ([]string, error) {
 		return []string{}, nil
 	}
 
-	return matches, afero.Walk(fs, prefix, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
+	return matches, afero.Walk(fs, prefix, func(path string, info os.FileInfo, _ error) error {
 		if matcher.Match(path) && !info.IsDir() {
 			matches = append(matches, path)
 		}
-
 		return nil
 	})
 }

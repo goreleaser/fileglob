@@ -1,7 +1,6 @@
 package fileglob
 
 import (
-	"path/filepath"
 	"testing"
 )
 
@@ -20,7 +19,7 @@ func TestStaticPrefix(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		prefix, err := staticPrefix(testCase.pattern, filepath.Separator)
+		prefix, err := staticPrefix(testCase.pattern)
 		if err != nil {
 			t.Errorf("staticPrefix: %v", err)
 		}

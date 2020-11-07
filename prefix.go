@@ -11,12 +11,12 @@ import (
 
 // staticPrefix returns the file path inside the pattern up
 // to the first path element that contains a wildcard.
-func staticPrefix(pattern string, separator rune) (string, error) {
-	parts := strings.Split(pattern, string(separator))
+func staticPrefix(pattern string) (string, error) {
+	parts := strings.Split(pattern, string(filepath.Separator))
 
 	prefix := ""
-	if len(pattern) > 0 && rune(pattern[0]) == separator {
-		prefix = string(separator)
+	if len(pattern) > 0 && rune(pattern[0]) == filepath.Separator {
+		prefix = string(filepath.Separator)
 	}
 
 	for _, part := range parts {

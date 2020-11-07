@@ -1,7 +1,7 @@
 <p align="center">
   <img alt="GoReleaser Logo" src="https://avatars2.githubusercontent.com/u/24697112?v=3&s=200" height="140" />
   <h1 align="center">fileglob</h1>
-  <p align="center">A file globbling library.</p>
+  <p align="center">A file globbing library.</p>
   <p align="center">
     <a href="https://github.com/goreleaser/fileglob/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/goreleaser/fileglob.svg?style=for-the-badge"></a>
     <a href="/LICENSE.md"><img alt="Software License" src="https://img.shields.io/badge/license-MIT-brightgreen.svg?style=for-the-badge"></a>

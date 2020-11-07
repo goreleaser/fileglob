@@ -175,7 +175,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("invalid pattern", func(t *testing.T) {
 		matches, err := Glob("[*", WithFs(testFs(t, nil, nil)))
-		require.EqualError(t, err, "unexpected end of input")
+		require.EqualError(t, err, "compile glob pattern: unexpected end of input")
 		require.Empty(t, matches)
 	})
 

@@ -71,7 +71,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen
 
 	matcher, err := glob.Compile(pattern, options.separator)
 	if err != nil {
-		return matches, err
+		return matches, fmt.Errorf("compile glob pattern: %w", err)
 	}
 
 	prefix, err := staticPrefix(pattern, options.separator)

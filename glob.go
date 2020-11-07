@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/afero"
 )
 
+// FileSystem is meant to be used with WithFs.
 type FileSystem afero.Fs
 
 // globOptions allowed to be passed to Glob.
@@ -20,17 +21,14 @@ type globOptions struct {
 	// be treated just like a matching file. If set to false, a matching directory
 	// will auto-match all files inside instead of the directory itself.
 	matchDirectoriesDirectly bool
-
-	separator rune
 }
 
-type OptFunc func(opts *globOptions) error
+type OptFunc func(opts *globOptions)
 
 // WithFs allows to provide another afero.Fs implementation to Glob.
 func WithFs(fs FileSystem) OptFunc {
-	return func(opts *globOptions) error {
+	return func(opts *globOptions) {
 		opts.fs = fs
-		return nil
 	}
 }
 
@@ -38,16 +36,8 @@ func WithFs(fs FileSystem) OptFunc {
 // result in only the folder name itself being returned (true) or
 // in all files inside that folder being returned (false).
 func MatchDirectories(v bool) OptFunc {
-	return func(opts *globOptions) error {
+	return func(opts *globOptions) {
 		opts.matchDirectoriesDirectly = v
-		return nil
-	}
-}
-
-func WithSeparator(sep rune) OptFunc {
-	return func(opts *globOptions) error {
-		opts.separator = sep
-		return nil
 	}
 }
 
@@ -59,22 +49,18 @@ func QuoteMeta(pattern string) string {
 
 // Glob returns all files that match the given pattern in the current directory.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen
-	options, err := compileOptions(opts)
-	if err != nil {
-		return nil, fmt.Errorf("compile options: %w", err)
-	}
-
+	var options = compileOptions(opts)
 	pattern = strings.TrimPrefix(pattern, "./")
 
 	var fs = options.fs
 	var matches []string
 
-	matcher, err := glob.Compile(pattern, options.separator)
+	matcher, err := glob.Compile(pattern, filepath.Separator)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
 	}
 
-	prefix, err := staticPrefix(pattern, options.separator)
+	prefix, err := staticPrefix(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine static prefix: %w", err)
 	}
@@ -131,20 +117,16 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen
 	})
 }
 
-func compileOptions(optFuncs []OptFunc) (*globOptions, error) {
+func compileOptions(optFuncs []OptFunc) *globOptions {
 	var opts = &globOptions{
-		fs:        afero.NewOsFs(),
-		separator: filepath.Separator,
+		fs: afero.NewOsFs(),
 	}
 
-	for _, optFunc := range optFuncs {
-		err := optFunc(opts)
-		if err != nil {
-			return nil, fmt.Errorf("applying options: %w", err)
-		}
+	for _, apply := range optFuncs {
+		apply(opts)
 	}
 
-	return opts, nil
+	return opts
 }
 
 func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {

@@ -10,14 +10,45 @@ import (
 	"github.com/spf13/afero"
 )
 
-// Options allowed to be passed to Glob.
-type Options struct {
+type FileSystem afero.Fs
+
+// globOptions allowed to be passed to Glob.
+type globOptions struct {
 	fs afero.Fs
+
+	// if matchDirectories directly is set to true  a matching directory will
+	// be treated just like a matching file. If set to false, a matching directory
+	// will auto-match all files inside instead of the directory itself.
+	matchDirectoriesDirectly bool
+
+	separator rune
 }
 
+type OptFunc func(opts *globOptions) error
+
 // WithFs allows to provide another afero.Fs implementation to Glob.
-func WithFs(fs afero.Fs) Options {
-	return Options{fs: fs}
+func WithFs(fs FileSystem) OptFunc {
+	return func(opts *globOptions) error {
+		opts.fs = fs
+		return nil
+	}
+}
+
+// MatchDirectories determines weather a matching directory should
+// result in only the folder name itself being returned (true) or
+// in all files inside that folder being returned (false).
+func MatchDirectories(v bool) OptFunc {
+	return func(opts *globOptions) error {
+		opts.matchDirectoriesDirectly = v
+		return nil
+	}
+}
+
+func WithSeparator(sep rune) OptFunc {
+	return func(opts *globOptions) error {
+		opts.separator = sep
+		return nil
+	}
 }
 
 // QuoteMeta returns a string that quotes all glob pattern meta characters
@@ -27,19 +58,23 @@ func QuoteMeta(pattern string) string {
 }
 
 // Glob returns all files that match the given pattern in the current directory.
-func Glob(pattern string, opts ...Options) ([]string, error) {
-	var options = compileOptions(opts)
+func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen
+	options, err := compileOptions(opts)
+	if err != nil {
+		return nil, fmt.Errorf("compile options: %w", err)
+	}
+
 	pattern = strings.TrimPrefix(pattern, "./")
 
 	var fs = options.fs
 	var matches []string
 
-	matcher, err := glob.Compile(pattern, filepath.Separator)
+	matcher, err := glob.Compile(pattern, options.separator)
 	if err != nil {
 		return matches, err
 	}
 
-	prefix, err := staticPrefix(pattern)
+	prefix, err := staticPrefix(pattern, options.separator)
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine static prefix: %w", err)
 	}
@@ -74,7 +109,13 @@ func Glob(pattern string, opts ...Options) ([]string, error) {
 		}
 
 		if info.IsDir() {
-			// a direct match on a directory implies that all files inside match
+			if options.matchDirectoriesDirectly {
+				matches = append(matches, path)
+				return nil
+			}
+
+			// a direct match on a directory implies that all files inside
+			// match if options.matchFolders is false
 			filesInDir, err := filesInDirectory(fs, path)
 			if err != nil {
 				return err
@@ -82,24 +123,28 @@ func Glob(pattern string, opts ...Options) ([]string, error) {
 
 			matches = append(matches, filesInDir...)
 			return filepath.SkipDir
-		} else {
-			matches = append(matches, path)
 		}
+
+		matches = append(matches, path)
 
 		return nil
 	})
 }
 
-func compileOptions(opts []Options) Options {
-	var options = Options{
-		fs: afero.NewOsFs(),
+func compileOptions(optFuncs []OptFunc) (*globOptions, error) {
+	var opts = &globOptions{
+		fs:        afero.NewOsFs(),
+		separator: filepath.Separator,
 	}
-	for _, opt := range opts {
-		if opt.fs != nil {
-			options.fs = opt.fs
+
+	for _, optFunc := range optFuncs {
+		err := optFunc(opts)
+		if err != nil {
+			return nil, fmt.Errorf("applying options: %w", err)
 		}
 	}
-	return options
+
+	return opts, nil
 }
 
 func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {

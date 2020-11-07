@@ -117,12 +117,24 @@ func TestGlob(t *testing.T) {
 	})
 }
 
-func globInMemoryFs(pattern string, files []string) ([]string, error) {
+func TestQuoteMeta(t *testing.T) {
+	matches, err := globInMemoryFs(QuoteMeta("{a,b}/c"), []string{
+		"a/c",
+		"b/c",
+		"{a,b}/c",
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"{a,b}/c",
+	}, matches)
+}
+
+func globInMemoryFs(pattern string, files []string, options ...Options) ([]string, error) {
 	var fs = afero.NewMemMapFs()
 	if err := createFiles(fs, files); err != nil {
 		return []string{}, err
 	}
-	return GlobWithFs(fs, pattern)
+	return Glob(pattern, append(options, WithFs(fs))...)
 }
 
 func createFiles(fs afero.Fs, files []string) error {

@@ -10,15 +10,31 @@ import (
 	"github.com/spf13/afero"
 )
 
-func Glob(pattern string) ([]string, error) {
-	return GlobWithFs(afero.NewOsFs(), pattern)
+// Options allowed to be passed to Glob.
+type Options struct {
+	fs afero.Fs
 }
 
-func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
+// WithFs allows to provide another afero.Fs implementation to Glob.
+func WithFs(fs afero.Fs) Options {
+	return Options{fs: fs}
+}
+
+// QuoteMeta returns a string that quotes all glob pattern meta characters
+// inside the argument text; For example, QuoteMeta(`{foo*}`) returns `\{foo\*\}`.
+func QuoteMeta(pattern string) string {
+	return glob.QuoteMeta(pattern)
+}
+
+// Glob returns all files that match the given pattern in the current directory.
+func Glob(pattern string, opts ...Options) ([]string, error) {
+	var options = compileOptions(opts)
+	pattern = strings.TrimPrefix(pattern, "./")
+
+	var fs = options.fs
 	var matches []string
 
-	pattern = strings.TrimPrefix(pattern, "./")
-	matcher, err := glob.Compile(pattern)
+	matcher, err := glob.Compile(pattern, filepath.Separator)
 	if err != nil {
 		return matches, err
 	}
@@ -72,6 +88,18 @@ func GlobWithFs(fs afero.Fs, pattern string) ([]string, error) {
 
 		return nil
 	})
+}
+
+func compileOptions(opts []Options) Options {
+	var options = Options{
+		fs: afero.NewOsFs(),
+	}
+	for _, opt := range opts {
+		if opt.fs != nil {
+			options.fs = opt.fs
+		}
+	}
+	return options
 }
 
 func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {

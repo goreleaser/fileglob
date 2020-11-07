@@ -130,6 +130,22 @@ func TestGlob(t *testing.T) {
 			"a/3.txt",
 		}, matches)
 	})
+
+	t.Run("invalid pattern", func(t *testing.T) {
+		matches, err := globInMemoryFs("[*", []string{})
+		require.EqualError(t, err, "unexpected end of input")
+		require.Empty(t, matches)
+	})
+
+	t.Run("prefix is a file", func(t *testing.T) {
+		matches, err := globInMemoryFs("ab/c/*", []string{
+			"ab/c",
+			"ab/d",
+			"ab/e",
+		})
+		require.NoError(t, err)
+		require.Empty(t, matches)
+	})
 }
 
 func TestQuoteMeta(t *testing.T) {

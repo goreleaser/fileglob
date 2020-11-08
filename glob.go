@@ -48,10 +48,14 @@ func QuoteMeta(pattern string) string {
 }
 
 // Glob returns all files that match the given pattern in the current directory.
-func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen
-	var options = compileOptions(opts)
-	pattern = strings.TrimPrefix(pattern, "./")
+func Glob(pattern string, opts ...OptFunc) ([]string, error) {
+	return doGlob(
+		strings.TrimPrefix(pattern, "./"),
+		compileOptions(opts),
+	)
+}
 
+func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:funlen
 	var fs = options.fs
 	var matches []string
 

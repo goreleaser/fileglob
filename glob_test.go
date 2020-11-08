@@ -131,8 +131,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"./a/nope.txt",
 			"./a/b/dc",
 		}, nil)))
-		require.NoError(t, err)
-		require.Equal(t, []string{}, matches)
+		require.EqualError(t, err, "file does not exist")
+		require.Empty(t, matches)
 	})
 
 	t.Run("no matches", func(t *testing.T) {

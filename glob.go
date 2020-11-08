@@ -74,6 +74,9 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 	if os.IsNotExist(err) {
 		// if the prefix does not exist, the whole
 		// glob pattern won't match anything
+		if prefix == pattern {
+			return []string{}, fmt.Errorf("file does not exist")
+		}
 		return []string{}, nil
 	}
 	if err != nil {

@@ -13,7 +13,7 @@ import (
 // error if the pattern is invalid and nil otherwise.
 func ValidPattern(pattern string) error {
 	_, err := ast.Parse(lexer.NewLexer(pattern))
-	return err
+	return err // nolint:wrapcheck
 }
 
 // ContainsMatchers determines whether the pattern contains any type of glob
@@ -24,23 +24,32 @@ func ContainsMatchers(pattern string) bool {
 		return false
 	}
 
-	return containsMatchers(rootNode)
+	containsMatchers, _ := containsMatchers(rootNode)
+	return containsMatchers
 }
 
-func containsMatchers(node *ast.Node) bool {
+func containsMatchers(node *ast.Node) (result bool, staticText string) {
+	// nolint:exhaustive
 	switch node.Kind {
 	case ast.KindPattern:
+		text := ""
+
 		for _, child := range node.Children {
-			if containsMatchers(child) {
-				return true
+			cm, staticText := containsMatchers(child)
+			if cm {
+				return true, ""
 			}
+
+			text += staticText
 		}
 
-		return false
-	case ast.KindText, ast.KindNothing:
-		return false
+		return false, text
+	case ast.KindText:
+		return false, node.Value.(ast.Text).Text
+	case ast.KindNothing:
+		return false, ""
 	default:
-		return true
+		return true, ""
 	}
 }
 
@@ -64,11 +73,12 @@ func staticPrefix(pattern string) (string, error) {
 			return "", fmt.Errorf("parse glob pattern: %w", err)
 		}
 
-		if containsMatchers(rootNode) {
+		cm, staticText := containsMatchers(rootNode)
+		if cm {
 			break
 		}
 
-		prefix = filepath.Join(prefix, pattern)
+		prefix = filepath.Join(prefix, staticText)
 	}
 
 	if prefix == "" {

@@ -23,6 +23,7 @@ type globOptions struct {
 	matchDirectoriesDirectly bool
 }
 
+// OptFunc is a function that allow to customize Glob.
 type OptFunc func(opts *globOptions)
 
 // WithFs allows to provide another afero.Fs implementation to Glob.

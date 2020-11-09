@@ -128,6 +128,15 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		require.Equal(t, []string{"a/b/c"}, matches)
 	})
 
+	t.Run("direct match wildcard", func(t *testing.T) {
+		matches, err := Glob(QuoteMeta("a/b/c{a"), WithFs(testFs(t, []string{
+			"./a/nope.txt",
+			"a/b/c{a",
+		}, nil)))
+		require.NoError(t, err)
+		require.Equal(t, []string{"a/b/c{a"}, matches)
+	})
+
 	t.Run("direct no match", func(t *testing.T) {
 		matches, err := Glob("a/b/d", WithFs(testFs(t, []string{
 			"./a/nope.txt",
@@ -142,6 +151,15 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		matches, err := Glob("a/\\{b\\}", WithFs(testFs(t, nil, nil)))
 		require.EqualError(t, err, "matching \"a/{b}\": file does not exist")
 		require.True(t, errors.Is(err, os.ErrNotExist))
+		require.Empty(t, matches)
+	})
+
+	t.Run("direct no match escaped wildcards", func(t *testing.T) {
+		matches, err := Glob(QuoteMeta("a/b/c{a"), WithFs(testFs(t, []string{
+			"./a/nope.txt",
+			"./a/b/dc",
+		}, nil)))
+		require.EqualError(t, err, "matching \"a/b/c{a\": file does not exist")
 		require.Empty(t, matches)
 	})
 

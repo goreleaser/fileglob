@@ -134,7 +134,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"a/b/c{a",
 		}, nil)))
 		require.NoError(t, err)
-		require.Equal(t, []string{"a/b/c\\a{"}, matches)
+		require.Equal(t, []string{"a/b/c{a"}, matches)
 	})
 
 	t.Run("direct no match", func(t *testing.T) {
@@ -159,7 +159,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"./a/nope.txt",
 			"./a/b/dc",
 		}, nil)))
-		require.EqualError(t, err, "file does not exist")
+		require.EqualError(t, err, "matching \"a/b/c{a\": file does not exist")
 		require.Empty(t, matches)
 	})
 

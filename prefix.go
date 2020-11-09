@@ -24,32 +24,35 @@ func ContainsMatchers(pattern string) bool {
 		return false
 	}
 
-	containsMatchers, _ := containsMatchers(rootNode)
-	return containsMatchers
+	_, isStatic := staticText(rootNode)
+	return !isStatic
 }
 
-func containsMatchers(node *ast.Node) (result bool, staticText string) {
+// staticText returns the static string matcher represented by the AST unless
+// it contains dynamic matchers (wildcards, etc.). In this case the ok return
+// value is false.
+func staticText(node *ast.Node) (text string, ok bool) {
 	// nolint:exhaustive
 	switch node.Kind {
 	case ast.KindPattern:
 		text := ""
 
 		for _, child := range node.Children {
-			cm, staticText := containsMatchers(child)
-			if cm {
-				return true, ""
+			childText, ok := staticText(child)
+			if !ok {
+				return "", false
 			}
 
-			text += staticText
+			text += childText
 		}
 
-		return false, text
+		return text, true
 	case ast.KindText:
-		return false, node.Value.(ast.Text).Text
+		return node.Value.(ast.Text).Text, true
 	case ast.KindNothing:
-		return false, ""
+		return "", true
 	default:
-		return true, ""
+		return "", false
 	}
 }
 
@@ -73,12 +76,12 @@ func staticPrefix(pattern string) (string, error) {
 			return "", fmt.Errorf("parse glob pattern: %w", err)
 		}
 
-		cm, staticText := containsMatchers(rootNode)
-		if cm {
+		staticPart, ok := staticText(rootNode)
+		if !ok {
 			break
 		}
 
-		prefix = filepath.Join(prefix, staticText)
+		prefix = filepath.Join(prefix, staticPart)
 	}
 
 	if prefix == "" {

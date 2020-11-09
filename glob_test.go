@@ -1,6 +1,8 @@
 package fileglob
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -131,8 +133,15 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"./a/nope.txt",
 			"./a/b/dc",
 		}, nil)))
-		require.NoError(t, err)
-		require.Equal(t, []string{}, matches)
+		require.EqualError(t, err, "matching \"a/b/d\": file does not exist")
+		require.True(t, errors.Is(err, os.ErrNotExist))
+		require.Empty(t, matches)
+	})
+
+	t.Run("escaped direct no match", func(t *testing.T) {
+		matches, err := Glob("a/\\{b\\}", WithFs(testFs(t, nil, nil)))
+		require.EqualError(t, err, "matching \"a/{b}\": file does not exist")
+		require.Empty(t, matches)
 	})
 
 	t.Run("no matches", func(t *testing.T) {

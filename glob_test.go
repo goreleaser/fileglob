@@ -129,7 +129,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("direct match wildcard", func(t *testing.T) {
 		matches, err := Glob(QuoteMeta("a/b/c{a"), WithFs(testFs(t, []string{
 			"./a/nope.txt",
-			QuoteMeta("a/b/c{a"),
+			"a/b/c{a",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{"a/b/c\\a{"}, matches)

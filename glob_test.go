@@ -141,6 +141,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("escaped direct no match", func(t *testing.T) {
 		matches, err := Glob("a/\\{b\\}", WithFs(testFs(t, nil, nil)))
 		require.EqualError(t, err, "matching \"a/{b}\": file does not exist")
+		require.True(t, errors.Is(err, os.ErrNotExist))
 		require.Empty(t, matches)
 	})
 

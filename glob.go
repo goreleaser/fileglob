@@ -72,15 +72,17 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 
 	prefixInfo, err := fs.Stat(prefix)
 	if os.IsNotExist(err) {
-		// if the prefix does not exist, the whole
-		// glob pattern won't match anything
-		if prefix == pattern {
-			return []string{}, fmt.Errorf("file does not exist")
+		if !ContainsMatchers(pattern) {
+			// glob contains no dynamic matchers so prefix is the file name that
+			// the glob references directly. When the glob explicitly references
+			// a single non-existing file, return an error for the user to check.
+			return []string{}, fmt.Errorf("matching %q: %w", prefix, os.ErrNotExist)
 		}
+
 		return []string{}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("stat prefix: %w", err)
+		return nil, fmt.Errorf("stat static prefix %q: %w", prefix, err)
 	}
 
 	if !prefixInfo.IsDir() {

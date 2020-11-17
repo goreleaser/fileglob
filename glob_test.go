@@ -48,9 +48,9 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		require.Equal(t, []string{"a/b/file1.txt"}, matches)
 	})
 
-	t.Run("super asterisk", func(t *testing.T) {
+	t.Run("super star", func(t *testing.T) {
 		matches, err := Glob("a/**/*", WithFs(testFs(t, []string{
-			"./a/nope.txt",
+			"./a/yeap.txt",
 			"./a/d/file1.txt",
 			"./a/e/f/file1.txt",
 			"./a/b/file1.txt",
@@ -60,6 +60,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"a/b/file1.txt",
 			"a/d/file1.txt",
 			"a/e/f/file1.txt",
+			"a/yeap.txt",
 		}, matches)
 	})
 

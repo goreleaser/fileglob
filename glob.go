@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/gobwas/glob"
@@ -48,10 +49,17 @@ func QuoteMeta(pattern string) string {
 	return glob.QuoteMeta(pattern)
 }
 
+// used to replace patterns ending with **/* with only **, which is what most
+// users would expect.
+var endsWithSuperStarSlashStar = regexp.MustCompile(".*\\*\\*/\\*$")
+
 // Glob returns all files that match the given pattern in the current directory.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 	return doGlob(
-		strings.TrimPrefix(pattern, "./"),
+		endsWithSuperStarSlashStar.ReplaceAllString(
+			strings.TrimPrefix(pattern, "./"),
+			"**",
+		),
 		compileOptions(opts),
 	)
 }

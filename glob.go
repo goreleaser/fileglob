@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gobwas/glob"
 	"github.com/spf13/afero"
@@ -51,7 +50,7 @@ func QuoteMeta(pattern string) string {
 // Glob returns all files that match the given pattern in the current directory.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 	return doGlob(
-		strings.TrimPrefix(pattern, "./"),
+		filepath.Clean(pattern),
 		compileOptions(opts),
 	)
 }

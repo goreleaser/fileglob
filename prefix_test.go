@@ -11,6 +11,7 @@ import (
 )
 
 func TestStaticPrefix(t *testing.T) {
+	t.Parallel()
 	var testCases = []struct {
 		pattern string
 		prefix  string
@@ -22,6 +23,7 @@ func TestStaticPrefix(t *testing.T) {
 		{"./", "."},
 		{"fo\\*o/bar/b*z", "fo*o/bar"},
 		{"/\\{foo\\}/bar", "/{foo}/bar"},
+		{"C:/Path/To/Some/File", "C:/Path/To/Some/File"},
 	}
 
 	for _, testCase := range testCases {
@@ -32,6 +34,7 @@ func TestStaticPrefix(t *testing.T) {
 }
 
 func TestContainsMatchers(t *testing.T) {
+	t.Parallel()
 	var testCases = []struct {
 		pattern          string
 		containsMatchers bool
@@ -57,6 +60,7 @@ func TestContainsMatchers(t *testing.T) {
 }
 
 func TestValidPattern(t *testing.T) {
+	t.Parallel()
 	var testCases = []struct {
 		pattern string
 		valid   bool

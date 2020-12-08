@@ -10,6 +10,11 @@ import (
 	"github.com/spf13/afero"
 )
 
+const (
+	runeSeparator   = '/'
+	stringSeparator = string(runeSeparator)
+)
+
 // FileSystem is meant to be used with WithFs.
 type FileSystem afero.Fs
 
@@ -48,10 +53,16 @@ func QuoteMeta(pattern string) string {
 	return glob.QuoteMeta(pattern)
 }
 
+// toNixPath converts the path to the nix style path
+// Windows style path separators are escape characters so cause issues with the compiled glob.
+func toNixPath(path string) string {
+	return filepath.ToSlash(filepath.Clean(path))
+}
+
 // Glob returns all files that match the given pattern in the current directory.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 	return doGlob(
-		strings.TrimPrefix(pattern, "./"),
+		strings.TrimPrefix(pattern, "."+stringSeparator),
 		compileOptions(opts),
 	)
 }
@@ -60,7 +71,7 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 	var fs = options.fs
 	var matches []string
 
-	matcher, err := glob.Compile(pattern, filepath.Separator)
+	matcher, err := glob.Compile(pattern, runeSeparator)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
 	}
@@ -76,7 +87,7 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 			// glob contains no dynamic matchers so prefix is the file name that
 			// the glob references directly. When the glob explicitly references
 			// a single non-existing file, return an error for the user to check.
-			return []string{}, fmt.Errorf("matching %q: %w", prefix, os.ErrNotExist)
+			return []string{}, fmt.Errorf(`matching "%s": %w`, prefix, os.ErrNotExist)
 		}
 
 		return []string{}, nil
@@ -100,6 +111,8 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 			return err
 		}
 
+		// The glob ast from github.com/gobwas/glob only works properly with linux paths
+		path = toNixPath(path)
 		if !matcher.Match(path) {
 			return nil
 		}
@@ -149,6 +162,7 @@ func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {
 		if info.IsDir() {
 			return nil
 		}
+		path = toNixPath(path)
 		files = append(files, path)
 		return nil
 	})

@@ -2,7 +2,6 @@ package fileglob
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/gobwas/glob/syntax/ast"
@@ -59,13 +58,10 @@ func staticText(node *ast.Node) (text string, ok bool) {
 // staticPrefix returns the file path inside the pattern up
 // to the first path element that contains a wildcard.
 func staticPrefix(pattern string) (string, error) {
-	parts := strings.Split(pattern, string(filepath.Separator))
+	parts := strings.Split(pattern, stringSeparator)
 
-	prefix := ""
-	if len(pattern) > 0 && rune(pattern[0]) == filepath.Separator {
-		prefix = string(filepath.Separator)
-	}
-
+	// nolint:prealloc
+	var prefixPath []string
 	for _, part := range parts {
 		if part == "" {
 			continue
@@ -81,7 +77,11 @@ func staticPrefix(pattern string) (string, error) {
 			break
 		}
 
-		prefix = filepath.Join(prefix, staticPart)
+		prefixPath = append(prefixPath, staticPart)
+	}
+	prefix := strings.Join(prefixPath, stringSeparator)
+	if len(pattern) > 0 && rune(pattern[0]) == runeSeparator && !strings.HasPrefix(prefix, stringSeparator) {
+		prefix = stringSeparator + prefix
 	}
 
 	if prefix == "" {

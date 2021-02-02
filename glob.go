@@ -43,7 +43,7 @@ func WithFs(fs FileSystem) OptFunc {
 //
 // This is the default behavior.
 //
-// Also check MatchDirectoryAsFile
+// Also check MatchDirectoryAsFile.
 func MatchDirectoryIncludesContents() OptFunc {
 	return func(opts *globOptions) {
 		opts.matchDirectoriesDirectly = false
@@ -51,6 +51,7 @@ func MatchDirectoryIncludesContents() OptFunc {
 }
 
 // MatchDirectoryAsFile makes a match on a directory match its name only.
+//
 // Also check MatchDirectoryIncludesContents.
 func MatchDirectoryAsFile() OptFunc {
 	return func(opts *globOptions) {

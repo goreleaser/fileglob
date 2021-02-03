@@ -254,7 +254,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("match directories directly", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("/a/{b,c}", MatchDirectories(true), WithFs(testFs(t, []string{
+		matches, err := Glob("/a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
 			"/a/b/d",
 			"/a/b/e/f",
 			"/a/c",
@@ -268,7 +268,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("match empty directory", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("/a/{b,c}", MatchDirectories(true), WithFs(testFs(t, []string{
+		matches, err := Glob("/a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
 			"/a/b",
 		}, []string{
 			"/a/c",
@@ -282,7 +282,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("pattern ending with star and subdir", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("a/*", WithFs(testFs(t, []string{
+		matches, err := Glob("a/*", MatchDirectoryIncludesContents, WithFs(testFs(t, []string{
 			"./a/1.txt",
 			"./a/2.txt",
 			"./a/3.txt",

@@ -22,7 +22,7 @@ type FileSystem afero.Fs
 type globOptions struct {
 	fs afero.Fs
 
-	// if matchDirectories directly is set to true  a matching directory will
+	// if matchDirectories directly is set to true a matching directory will
 	// be treated just like a matching file. If set to false, a matching directory
 	// will auto-match all files inside instead of the directory itself.
 	matchDirectoriesDirectly bool
@@ -38,9 +38,28 @@ func WithFs(fs FileSystem) OptFunc {
 	}
 }
 
+// MatchDirectoryIncludesContents makes a match on a directory match all
+// files inside it as well.
+//
+// This is the default behavior.
+//
+// Also check MatchDirectoryAsFile.
+func MatchDirectoryIncludesContents(opts *globOptions) {
+	opts.matchDirectoriesDirectly = false
+}
+
+// MatchDirectoryAsFile makes a match on a directory match its name only.
+//
+// Also check MatchDirectoryIncludesContents.
+func MatchDirectoryAsFile(opts *globOptions) {
+	opts.matchDirectoriesDirectly = true
+}
+
 // MatchDirectories determines weather a matching directory should
 // result in only the folder name itself being returned (true) or
 // in all files inside that folder being returned (false).
+//
+// Deprecated: use MatchDirectoryIncludesContents and MatchDirectoryAsFile instead.
 func MatchDirectories(v bool) OptFunc {
 	return func(opts *globOptions) {
 		opts.matchDirectoriesDirectly = v

@@ -12,7 +12,7 @@ import (
 
 func TestStaticPrefix(t *testing.T) {
 	t.Parallel()
-	var testCases = []struct {
+	testCases := []struct {
 		pattern string
 		prefix  string
 	}{
@@ -35,7 +35,7 @@ func TestStaticPrefix(t *testing.T) {
 
 func TestContainsMatchers(t *testing.T) {
 	t.Parallel()
-	var testCases = []struct {
+	testCases := []struct {
 		pattern          string
 		containsMatchers bool
 	}{
@@ -61,7 +61,7 @@ func TestContainsMatchers(t *testing.T) {
 
 func TestValidPattern(t *testing.T) {
 	t.Parallel()
-	var testCases = []struct {
+	testCases := []struct {
 		pattern string
 		valid   bool
 	}{

@@ -32,10 +32,10 @@ type globOptions struct {
 // OptFunc is a function that allow to customize Glob.
 type OptFunc func(opts *globOptions)
 
-// WithFs allows to provide another afero.Fs implementation to Glob.
-func WithFs(fs FileSystem) OptFunc {
+// WithFs allows to provide another fs.FS implementation to Glob.
+func WithFs(f FileSystem) OptFunc {
 	return func(opts *globOptions) {
-		opts.fs = fs
+		opts.fs = f
 	}
 }
 
@@ -160,7 +160,7 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 }
 
 func compileOptions(optFuncs []OptFunc) *globOptions {
-	var opts = &globOptions{
+	opts := &globOptions{
 		fs: os.DirFS("."),
 	}
 

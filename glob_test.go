@@ -317,34 +317,16 @@ func TestQuoteMeta(t *testing.T) {
 func testFs(tb testing.TB, files, dirs []string) fs.FS {
 	tb.Helper()
 
-	fs := memfs.New()
-
-	if dirs == nil {
-		dirs = dirsFor(files)
-	}
-	for _, dir := range dirs {
-		if err := fs.MkdirAll(filepath.FromSlash(dir), 0664); err != nil {
-			require.NoError(tb, err)
-		}
-	}
+	var tmpfs = memfs.New()
 
 	for _, file := range files {
-		if err := fs.WriteFile(filepath.FromSlash(file), []byte(file), 0654); err != nil {
-			require.NoError(tb, err)
-		}
+		require.NoError(tb, tmpfs.MkdirAll(filepath.Dir(filepath.FromSlash(file)), 0664))
+		require.NoError(tb, tmpfs.WriteFile(filepath.FromSlash(file), []byte(file), 0654))
 	}
 
-	return fs
-}
+	for _, dir := range dirs {
+		require.NoError(tb, tmpfs.MkdirAll(filepath.FromSlash(dir), 0664))
+	}
 
-func dirsFor(files []string) []string {
-	var dirs = map[string]bool{}
-	for _, f := range files {
-		dirs[filepath.Dir(f)] = true
-	}
-	var result []string
-	for dir := range dirs {
-		result = append(result, dir)
-	}
-	return result
+	return tmpfs
 }

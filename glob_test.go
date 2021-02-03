@@ -3,7 +3,6 @@ package fileglob
 import (
 	"errors"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -156,7 +155,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"a/b/dc",
 		}, nil)))
 		require.EqualError(t, err, "matching \"a/b/d\": file does not exist")
-		require.True(t, errors.Is(err, os.ErrNotExist))
+		require.True(t, errors.Is(err, fs.ErrNotExist))
 		require.Empty(t, matches)
 	})
 
@@ -164,7 +163,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		t.Parallel()
 		matches, err := Glob("a/\\{b\\}", WithFs(testFs(t, nil, nil)))
 		require.EqualError(t, err, "matching \"a/{b}\": file does not exist")
-		require.True(t, errors.Is(err, os.ErrNotExist))
+		require.True(t, errors.Is(err, fs.ErrNotExist))
 		require.Empty(t, matches)
 	})
 
@@ -302,18 +301,6 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	})
 }
 
-func dirsFor(files []string) []string {
-	var dirs = map[string]bool{}
-	for _, f := range files {
-		dirs[filepath.Dir(f)] = true
-	}
-	var result []string
-	for dir := range dirs {
-		result = append(result, dir)
-	}
-	return result
-}
-
 func TestQuoteMeta(t *testing.T) {
 	t.Parallel()
 	matches, err := Glob(QuoteMeta("{a,b}/c"), WithFs(testFs(t, []string{
@@ -348,4 +335,16 @@ func testFs(tb testing.TB, files, dirs []string) fs.FS {
 	}
 
 	return fs
+}
+
+func dirsFor(files []string) []string {
+	var dirs = map[string]bool{}
+	for _, f := range files {
+		dirs[filepath.Dir(f)] = true
+	}
+	var result []string
+	for dir := range dirs {
+		result = append(result, dir)
+	}
+	return result
 }

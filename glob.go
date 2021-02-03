@@ -17,9 +17,7 @@ const (
 )
 
 // FileSystem is meant to be used with WithFs.
-type FileSystem interface {
-	fs.FS
-}
+type FileSystem fs.FS
 
 // globOptions allowed to be passed to Glob.
 type globOptions struct {

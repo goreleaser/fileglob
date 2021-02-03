@@ -2,11 +2,12 @@ package fileglob
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/afero"
+	"github.com/psanford/memfs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,12 +26,12 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("simple", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("./a/*/*", WithFs(testFs(t, []string{
-			"./c/file1.txt",
-			"./a/nope/file1.txt",
-			"./a/something",
-			"./a/b/file1.txt",
-			"./a/c/file2.txt",
-			"./a/d/file1.txt",
+			"c/file1.txt",
+			"a/nope/file1.txt",
+			"a/something",
+			"a/b/file1.txt",
+			"a/c/file2.txt",
+			"a/d/file1.txt",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
@@ -44,9 +45,9 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("single file", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("a/b/*", WithFs(testFs(t, []string{
-			"./c/file1.txt",
-			"./a/nope/file1.txt",
-			"./a/b/file1.txt",
+			"c/file1.txt",
+			"a/nope/file1.txt",
+			"a/b/file1.txt",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{"a/b/file1.txt"}, matches)
@@ -55,10 +56,10 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("super asterisk", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("a/**/*", WithFs(testFs(t, []string{
-			"./a/nope.txt",
-			"./a/d/file1.txt",
-			"./a/e/f/file1.txt",
-			"./a/b/file1.txt",
+			"a/nope.txt",
+			"a/d/file1.txt",
+			"a/e/f/file1.txt",
+			"a/b/file1.txt",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
@@ -131,8 +132,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("direct match", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("a/b/c", WithFs(testFs(t, []string{
-			"./a/nope.txt",
-			"./a/b/c",
+			"a/nope.txt",
+			"a/b/c",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{"a/b/c"}, matches)
@@ -141,7 +142,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("direct match wildcard", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob(QuoteMeta("a/b/c{a"), WithFs(testFs(t, []string{
-			"./a/nope.txt",
+			"a/nope.txt",
 			"a/b/c{a",
 		}, nil)))
 		require.NoError(t, err)
@@ -151,8 +152,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("direct no match", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("a/b/d", WithFs(testFs(t, []string{
-			"./a/nope.txt",
-			"./a/b/dc",
+			"a/nope.txt",
+			"a/b/dc",
 		}, nil)))
 		require.EqualError(t, err, "matching \"a/b/d\": file does not exist")
 		require.True(t, errors.Is(err, os.ErrNotExist))
@@ -170,8 +171,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("direct no match escaped wildcards", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob(QuoteMeta("a/b/c{a"), WithFs(testFs(t, []string{
-			"./a/nope.txt",
-			"./a/b/dc",
+			"a/nope.txt",
+			"a/b/dc",
 		}, nil)))
 		require.EqualError(t, err, "matching \"a/b/c{a\": file does not exist")
 		require.Empty(t, matches)
@@ -180,7 +181,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("no matches", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("z/*", WithFs(testFs(t, []string{
-			"./a/nope.txt",
+			"a/nope.txt",
 		}, nil)))
 		require.NoError(t, err)
 		require.Empty(t, matches)
@@ -239,54 +240,54 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("match files in directories", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("/a/{b,c}", WithFs(testFs(t, []string{
-			"/a/b/d",
-			"/a/b/e/f",
-			"/a/c",
+		matches, err := Glob("a/{b,c}", WithFs(testFs(t, []string{
+			"a/b/d",
+			"a/b/e/f",
+			"a/c",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"/a/b/d",
-			"/a/b/e/f",
-			"/a/c",
+			"a/b/d",
+			"a/b/e/f",
+			"a/c",
 		}, matches)
 	})
 
 	t.Run("match directories directly", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("/a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
-			"/a/b/d",
-			"/a/b/e/f",
-			"/a/c",
+		matches, err := Glob("a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
+			"a/b/d",
+			"a/b/e/f",
+			"a/c",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"/a/b",
-			"/a/c",
+			"a/b",
+			"a/c",
 		}, matches)
 	})
 
 	t.Run("match empty directory", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("/a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
-			"/a/b",
+		matches, err := Glob("a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
+			"a/b",
 		}, []string{
-			"/a/c",
+			"a/c",
 		})))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"/a/b",
-			"/a/c",
+			"a/b",
+			"a/c",
 		}, matches)
 	})
 
 	t.Run("pattern ending with star and subdir", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("a/*", MatchDirectoryIncludesContents, WithFs(testFs(t, []string{
-			"./a/1.txt",
-			"./a/2.txt",
-			"./a/3.txt",
-			"./a/b/4.txt",
+			"a/1.txt",
+			"a/2.txt",
+			"a/3.txt",
+			"a/b/4.txt",
 		}, []string{
 			"a",
 			"a/b",
@@ -299,6 +300,18 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"a/b/4.txt",
 		}, matches)
 	})
+}
+
+func dirsFor(files []string) []string {
+	var dirs = map[string]bool{}
+	for _, f := range files {
+		dirs[filepath.Dir(f)] = true
+	}
+	var result []string
+	for dir := range dirs {
+		result = append(result, dir)
+	}
+	return result
 }
 
 func TestQuoteMeta(t *testing.T) {
@@ -314,19 +327,22 @@ func TestQuoteMeta(t *testing.T) {
 	}, matches)
 }
 
-func testFs(tb testing.TB, files, dirs []string) afero.Fs {
+func testFs(tb testing.TB, files, dirs []string) fs.FS {
 	tb.Helper()
 
-	fs := afero.NewMemMapFs()
+	fs := memfs.New()
 
-	for _, file := range files {
-		if _, err := fs.Create(filepath.FromSlash(file)); err != nil {
+	if dirs == nil {
+		dirs = dirsFor(files)
+	}
+	for _, dir := range dirs {
+		if err := fs.MkdirAll(filepath.FromSlash(dir), 0664); err != nil {
 			require.NoError(tb, err)
 		}
 	}
 
-	for _, dir := range dirs {
-		if err := fs.MkdirAll(filepath.FromSlash(dir), 0664); err != nil {
+	for _, file := range files {
+		if err := fs.WriteFile(filepath.FromSlash(file), []byte(file), 0654); err != nil {
 			require.NoError(tb, err)
 		}
 	}

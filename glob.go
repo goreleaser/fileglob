@@ -1,13 +1,14 @@
 package fileglob
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/gobwas/glob"
-	"github.com/spf13/afero"
 )
 
 const (
@@ -16,11 +17,13 @@ const (
 )
 
 // FileSystem is meant to be used with WithFs.
-type FileSystem afero.Fs
+type FileSystem interface {
+	fs.FS
+}
 
 // globOptions allowed to be passed to Glob.
 type globOptions struct {
-	fs afero.Fs
+	fs FileSystem
 
 	// if matchDirectories directly is set to true a matching directory will
 	// be treated just like a matching file. If set to false, a matching directory
@@ -87,7 +90,6 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 }
 
 func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:funlen
-	var fs = options.fs
 	var matches []string
 
 	matcher, err := glob.Compile(pattern, runeSeparator)
@@ -100,13 +102,13 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 		return nil, fmt.Errorf("cannot determine static prefix: %w", err)
 	}
 
-	prefixInfo, err := fs.Stat(prefix)
-	if os.IsNotExist(err) {
+	prefixInfo, err := fs.Stat(options.fs, prefix)
+	if errors.Is(err, fs.ErrNotExist) {
 		if !ContainsMatchers(pattern) {
 			// glob contains no dynamic matchers so prefix is the file name that
 			// the glob references directly. When the glob explicitly references
 			// a single non-existing file, return an error for the user to check.
-			return []string{}, fmt.Errorf(`matching "%s": %w`, prefix, os.ErrNotExist)
+			return []string{}, fmt.Errorf(`matching "%s": %w`, prefix, fs.ErrNotExist)
 		}
 
 		return []string{}, nil
@@ -125,7 +127,7 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 		return []string{}, nil
 	}
 
-	return matches, afero.Walk(fs, prefix, func(path string, info os.FileInfo, err error) error {
+	return matches, fs.WalkDir(options.fs, prefix, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -144,13 +146,13 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 
 			// a direct match on a directory implies that all files inside
 			// match if options.matchFolders is false
-			filesInDir, err := filesInDirectory(fs, path)
+			filesInDir, err := filesInDirectory(options.fs, path)
 			if err != nil {
 				return err
 			}
 
 			matches = append(matches, filesInDir...)
-			return filepath.SkipDir
+			return fs.SkipDir
 		}
 
 		matches = append(matches, path)
@@ -161,7 +163,7 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 
 func compileOptions(optFuncs []OptFunc) *globOptions {
 	var opts = &globOptions{
-		fs: afero.NewOsFs(),
+		fs: os.DirFS("."),
 	}
 
 	for _, apply := range optFuncs {
@@ -171,10 +173,10 @@ func compileOptions(optFuncs []OptFunc) *globOptions {
 	return opts
 }
 
-func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {
+func filesInDirectory(dirFs fs.FS, dir string) ([]string, error) {
 	var files []string
 
-	return files, afero.Walk(fs, dir, func(path string, info os.FileInfo, err error) error {
+	return files, fs.WalkDir(dirFs, dir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}

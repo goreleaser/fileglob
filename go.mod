@@ -11,5 +11,3 @@ require (
 	github.com/stretchr/testify v1.6.1
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 )
-
-replace github.com/psanford/memfs => github.com/caarlos0/memfs v0.0.0-20210203022825-9723bb2bda6f

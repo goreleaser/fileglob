@@ -326,7 +326,7 @@ func testFs(tb testing.TB, files, dirs []string) afero.Fs {
 	}
 
 	for _, dir := range dirs {
-		if err := fs.MkdirAll(filepath.FromSlash(dir), 0664); err != nil {
+		if err := fs.MkdirAll(filepath.FromSlash(dir), 0o664); err != nil {
 			require.NoError(tb, err)
 		}
 	}

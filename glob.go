@@ -87,7 +87,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 }
 
 func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:funlen
-	var fs = options.fs
+	fs := options.fs
 	var matches []string
 
 	matcher, err := glob.Compile(pattern, runeSeparator)
@@ -160,7 +160,7 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 }
 
 func compileOptions(optFuncs []OptFunc) *globOptions {
-	var opts = &globOptions{
+	opts := &globOptions{
 		fs: afero.NewOsFs(),
 	}
 

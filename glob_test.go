@@ -3,10 +3,10 @@ package fileglob
 import (
 	"errors"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/psanford/memfs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -317,15 +317,17 @@ func TestQuoteMeta(t *testing.T) {
 func testFs(tb testing.TB, files, dirs []string) fs.FS {
 	tb.Helper()
 
-	tmpfs := memfs.New()
+	tmpdir := tb.TempDir()
+	tmpfs, err := fs.Sub(os.DirFS(tmpdir), ".")
+	require.NoError(tb, err)
 
 	for _, file := range files {
-		require.NoError(tb, tmpfs.MkdirAll(filepath.Dir(filepath.FromSlash(file)), 0o664))
-		require.NoError(tb, tmpfs.WriteFile(filepath.FromSlash(file), []byte(file), 0o654))
+		require.NoError(tb, os.MkdirAll(filepath.Join(tmpdir, filepath.Dir(file)), 0o764))
+		require.NoError(tb, os.WriteFile(filepath.Join(tmpdir, file), []byte(file), 0o654))
 	}
 
 	for _, dir := range dirs {
-		require.NoError(tb, tmpfs.MkdirAll(filepath.FromSlash(dir), 0o664))
+		require.NoError(tb, os.MkdirAll(filepath.Join(tmpdir, dir), 0o764))
 	}
 
 	return tmpfs

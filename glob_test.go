@@ -3,6 +3,7 @@ package fileglob
 import (
 	"errors"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -155,7 +156,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"./a/b/dc",
 		}, nil)))
 		require.EqualError(t, err, "matching \"a/b/d\": file does not exist")
-		require.True(t, errors.Is(err, fs.ErrNotExist))
+		require.True(t, errors.Is(err, os.ErrNotExist))
 		require.Empty(t, matches)
 	})
 
@@ -163,7 +164,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		t.Parallel()
 		matches, err := Glob("a/\\{b\\}", WithFs(testFs(t, nil, nil)))
 		require.EqualError(t, err, "matching \"a/{b}\": file does not exist")
-		require.True(t, errors.Is(err, fs.ErrNotExist))
+		require.True(t, errors.Is(err, os.ErrNotExist))
 		require.Empty(t, matches)
 	})
 
@@ -246,9 +247,9 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"a/b/d",
-			"a/b/e/f",
-			"a/c",
+			"/a/b/d",
+			"/a/b/e/f",
+			"/a/c",
 		}, matches)
 	})
 
@@ -261,8 +262,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"a/b",
-			"a/c",
+			"/a/b",
+			"/a/c",
 		}, matches)
 	})
 
@@ -271,12 +272,12 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		matches, err := Glob("/a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
 			"/a/b",
 		}, []string{
-			"a/c",
+			"/a/c",
 		})))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"a/b",
-			"a/c",
+			"/a/b",
+			"/a/c",
 		}, matches)
 	})
 

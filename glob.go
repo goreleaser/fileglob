@@ -27,6 +27,8 @@ type globOptions struct {
 	// be treated just like a matching file. If set to false, a matching directory
 	// will auto-match all files inside instead of the directory itself.
 	matchDirectoriesDirectly bool
+
+	prefix string
 }
 
 // OptFunc is a function that allow to customize Glob.
@@ -81,8 +83,16 @@ func toNixPath(path string) string {
 
 // Glob returns all files that match the given pattern in the current directory.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) {
+	prefix := "./"
+	if strings.HasPrefix(pattern, stringSeparator) {
+		prefix = stringSeparator
+		opts = append(opts, func(opts *globOptions) {
+			opts.prefix = prefix
+		})
+	}
+
 	return doGlob(
-		strings.TrimPrefix(strings.TrimPrefix(pattern, "."+stringSeparator), stringSeparator),
+		strings.TrimPrefix(pattern, prefix),
 		compileOptions(opts),
 	)
 }
@@ -138,13 +148,13 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 
 		if info.IsDir() {
 			if options.matchDirectoriesDirectly {
-				matches = append(matches, path)
+				matches = append(matches, options.prefix+path)
 				return nil
 			}
 
 			// a direct match on a directory implies that all files inside
 			// match if options.matchFolders is false
-			filesInDir, err := filesInDirectory(options.fs, path)
+			filesInDir, err := filesInDirectory(options, path)
 			if err != nil {
 				return err
 			}
@@ -153,7 +163,7 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 			return fs.SkipDir
 		}
 
-		matches = append(matches, path)
+		matches = append(matches, options.prefix+path)
 
 		return nil
 	})
@@ -171,10 +181,10 @@ func compileOptions(optFuncs []OptFunc) *globOptions {
 	return opts
 }
 
-func filesInDirectory(dirFs fs.FS, dir string) ([]string, error) {
+func filesInDirectory(options *globOptions, dir string) ([]string, error) {
 	var files []string
 
-	return files, fs.WalkDir(dirFs, dir, func(path string, info fs.DirEntry, err error) error {
+	return files, fs.WalkDir(options.fs, dir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -182,7 +192,7 @@ func filesInDirectory(dirFs fs.FS, dir string) ([]string, error) {
 			return nil
 		}
 		path = toNixPath(path)
-		files = append(files, path)
+		files = append(files, options.prefix+path)
 		return nil
 	})
 }

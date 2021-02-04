@@ -98,6 +98,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 }
 
 func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:funlen
+	fs := options.fs
 	var matches []string
 
 	matcher, err := glob.Compile(pattern, runeSeparator)

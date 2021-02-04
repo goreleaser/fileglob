@@ -317,19 +317,17 @@ func TestQuoteMeta(t *testing.T) {
 func testFs(tb testing.TB, files, dirs []string) afero.Fs {
 	tb.Helper()
 
-	fs := afero.NewMemMapFs()
+	tmpfs := afero.NewMemMapFs()
 
 	for _, file := range files {
-		if _, err := fs.Create(filepath.FromSlash(file)); err != nil {
+		if _, err := tmpfs.Create(filepath.FromSlash(file)); err != nil {
 			require.NoError(tb, err)
 		}
 	}
 
 	for _, dir := range dirs {
-		if err := fs.MkdirAll(filepath.FromSlash(dir), 0o664); err != nil {
-			require.NoError(tb, err)
-		}
+		require.NoError(tb, tmpfs.MkdirAll(filepath.FromSlash(dir), 0o664))
 	}
 
-	return fs
+	return tmpfs
 }

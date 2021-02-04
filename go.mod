@@ -3,7 +3,7 @@ module github.com/goreleaser/fileglob
 go 1.15
 
 require (
-	github.com/caarlos0/testfs v0.3.0
+	github.com/caarlos0/testfs v0.3.1
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gobwas/glob v0.2.3
 	github.com/kr/text v0.2.0 // indirect

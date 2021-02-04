@@ -25,12 +25,12 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("simple", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("./a/*/*", WithFs(testFs(t, []string{
-			"c/file1.txt",
-			"a/nope/file1.txt",
-			"a/something",
-			"a/b/file1.txt",
-			"a/c/file2.txt",
-			"a/d/file1.txt",
+			"./c/file1.txt",
+			"./a/nope/file1.txt",
+			"./a/something",
+			"./a/b/file1.txt",
+			"./a/c/file2.txt",
+			"./a/d/file1.txt",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
@@ -44,9 +44,9 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("single file", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("a/b/*", WithFs(testFs(t, []string{
-			"c/file1.txt",
-			"a/nope/file1.txt",
-			"a/b/file1.txt",
+			"./c/file1.txt",
+			"./a/nope/file1.txt",
+			"./a/b/file1.txt",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{"a/b/file1.txt"}, matches)
@@ -55,10 +55,10 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("super asterisk", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("a/**/*", WithFs(testFs(t, []string{
-			"a/nope.txt",
-			"a/d/file1.txt",
-			"a/e/f/file1.txt",
-			"a/b/file1.txt",
+			"./a/nope.txt",
+			"./a/d/file1.txt",
+			"./a/e/f/file1.txt",
+			"./a/b/file1.txt",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
@@ -131,8 +131,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("direct match", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("a/b/c", WithFs(testFs(t, []string{
-			"a/nope.txt",
-			"a/b/c",
+			"./a/nope.txt",
+			"./a/b/c",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{"a/b/c"}, matches)
@@ -141,7 +141,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("direct match wildcard", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob(QuoteMeta("a/b/c{a"), WithFs(testFs(t, []string{
-			"a/nope.txt",
+			"./a/nope.txt",
 			"a/b/c{a",
 		}, nil)))
 		require.NoError(t, err)
@@ -151,8 +151,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("direct no match", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("a/b/d", WithFs(testFs(t, []string{
-			"a/nope.txt",
-			"a/b/dc",
+			"./a/nope.txt",
+			"./a/b/dc",
 		}, nil)))
 		require.EqualError(t, err, "matching \"a/b/d\": file does not exist")
 		require.True(t, errors.Is(err, fs.ErrNotExist))
@@ -170,8 +170,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("direct no match escaped wildcards", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob(QuoteMeta("a/b/c{a"), WithFs(testFs(t, []string{
-			"a/nope.txt",
-			"a/b/dc",
+			"./a/nope.txt",
+			"./a/b/dc",
 		}, nil)))
 		require.EqualError(t, err, "matching \"a/b/c{a\": file does not exist")
 		require.Empty(t, matches)
@@ -180,7 +180,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("no matches", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("z/*", WithFs(testFs(t, []string{
-			"a/nope.txt",
+			"./a/nope.txt",
 		}, nil)))
 		require.NoError(t, err)
 		require.Empty(t, matches)
@@ -239,10 +239,10 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("match files in directories", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("a/{b,c}", WithFs(testFs(t, []string{
-			"a/b/d",
-			"a/b/e/f",
-			"a/c",
+		matches, err := Glob("/a/{b,c}", WithFs(testFs(t, []string{
+			"/a/b/d",
+			"/a/b/e/f",
+			"/a/c",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
@@ -254,10 +254,10 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("match directories directly", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
-			"a/b/d",
-			"a/b/e/f",
-			"a/c",
+		matches, err := Glob("/a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
+			"/a/b/d",
+			"/a/b/e/f",
+			"/a/c",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
@@ -268,8 +268,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("match empty directory", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
-			"a/b",
+		matches, err := Glob("/a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
+			"/a/b",
 		}, []string{
 			"a/c",
 		})))
@@ -283,10 +283,10 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("pattern ending with star and subdir", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("a/*", MatchDirectoryIncludesContents, WithFs(testFs(t, []string{
-			"a/1.txt",
-			"a/2.txt",
-			"a/3.txt",
-			"a/b/4.txt",
+			"./a/1.txt",
+			"./a/2.txt",
+			"./a/3.txt",
+			"./a/b/4.txt",
 		}, []string{
 			"a",
 			"a/b",

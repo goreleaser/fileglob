@@ -82,7 +82,7 @@ func toNixPath(path string) string {
 // Glob returns all files that match the given pattern in the current directory.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 	return doGlob(
-		strings.TrimPrefix(pattern, "."+stringSeparator),
+		strings.TrimPrefix(strings.TrimPrefix(pattern, "."+stringSeparator), stringSeparator),
 		compileOptions(opts),
 	)
 }

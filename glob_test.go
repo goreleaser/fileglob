@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/caarlos0/testfs"
@@ -30,15 +29,13 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 		wd, err := os.Getwd()
 		require.NoError(t, err)
-
-		vol := filepath.VolumeName(wd)
-		if vol != "" {
-			wd = filepath.ToSlash(strings.ReplaceAll(wd, vol, strings.ReplaceAll(vol, ":", `\`)))
+		var opts []OptFunc
+		if runtime.GOOS == "windows" {
+			// should we handle that on Glob too?
+			opts = append(opts, WithFs(os.DirFS(filepath.VolumeName(wd)+`\`)))
 		}
 
-		t.Logf("wd: %s", wd)
-
-		matches, err := Glob(filepath.Join(wd, "*_test.go"))
+		matches, err := Glob(filepath.Join(wd, "*_test.go"), opts...)
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			filepath.Join(wd, "glob_test.go"),

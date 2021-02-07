@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/caarlos0/testfs"
@@ -29,6 +30,12 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 		wd, err := os.Getwd()
 		require.NoError(t, err)
+
+		vol := filepath.VolumeName(wd)
+		if vol != "" {
+			wd = strings.ReplaceAll(wd, vol, strings.ReplaceAll(vol, ":", `\`))
+		}
+
 		matches, err := Glob(filepath.Join(wd, "*_test.go"))
 		require.NoError(t, err)
 		require.Equal(t, []string{

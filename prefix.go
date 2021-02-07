@@ -58,7 +58,7 @@ func staticText(node *ast.Node) (text string, ok bool) {
 // staticPrefix returns the file path inside the pattern up
 // to the first path element that contains a wildcard.
 func staticPrefix(pattern string) (string, error) {
-	parts := strings.Split(toNixPath(pattern), stringSeparator)
+	parts := strings.Split(pattern, stringSeparator)
 
 	// nolint:prealloc
 	var prefixPath []string

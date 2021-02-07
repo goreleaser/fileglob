@@ -82,6 +82,7 @@ func toNixPath(path string) string {
 }
 
 // Glob returns all files that match the given pattern in the current directory.
+// If the given pattern indicates an absolute path, it will glob from `/`.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 	prefix := "./"
 	if strings.HasPrefix(pattern, stringSeparator) {

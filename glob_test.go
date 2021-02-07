@@ -29,14 +29,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 		wd, err := os.Getwd()
 		require.NoError(t, err)
-		var opts []OptFunc
-		if runtime.GOOS == "windows" {
-			opts = append(opts, WithFs(os.DirFS(toNixPath(filepath.VolumeName(wd)))))
-		}
 
-		t.Log(toNixPath(filepath.Join(wd, "*_test.go")))
-
-		matches, err := Glob(toNixPath(filepath.Join(wd, "*_test.go")), opts...)
+		matches, err := Glob(toNixPath(filepath.Join(wd, "*_test.go")))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			filepath.Join(wd, "glob_test.go"),

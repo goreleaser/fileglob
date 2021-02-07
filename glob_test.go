@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/caarlos0/testfs"
@@ -26,13 +27,13 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("real absolute", func(t *testing.T) {
 		t.Parallel()
 
-		abs, err := filepath.Abs(".")
+		wd, err := os.Getwd()
 		require.NoError(t, err)
-		matches, err := Glob(filepath.Join(abs, "*_test.go"))
+		matches, err := Glob(filepath.Join(wd, "*_test.go"))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			filepath.Join(abs, "glob_test.go"),
-			filepath.Join(abs, "prefix_test.go"),
+			filepath.Join(wd, "glob_test.go"),
+			filepath.Join(wd, "prefix_test.go"),
 		}, matches)
 	})
 
@@ -209,6 +210,9 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("escaped asterisk", func(t *testing.T) {
 		t.Parallel()
+		if runtime.GOOS == "windows" {
+			t.Skip("can't create paths with * on Windows")
+		}
 		matches, err := Glob("a/\\*/b", WithFs(testFs(t, []string{
 			"a/a/b",
 			"a/*/b",

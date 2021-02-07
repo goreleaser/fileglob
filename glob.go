@@ -98,8 +98,6 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 		}, WithFs(os.DirFS(prefix)))
 	}
 
-	fmt.Println("prefix:", prefix)
-
 	return doGlob(
 		strings.TrimPrefix(pattern, prefix),
 		compileOptions(opts),
@@ -107,7 +105,6 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 }
 
 func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:funlen
-	fmt.Println("pattern:", pattern)
 	var matches []string
 
 	matcher, err := glob.Compile(pattern, runeSeparator)
@@ -119,8 +116,6 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine static prefix: %w", err)
 	}
-
-	fmt.Println("static prefix:", prefix)
 
 	prefixInfo, err := fs.Stat(options.fs, prefix)
 	if errors.Is(err, fs.ErrNotExist) {

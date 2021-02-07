@@ -33,8 +33,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		matches, err := Glob(toNixPath(filepath.Join(wd, "*_test.go")))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			filepath.Join(wd, "glob_test.go"),
-			filepath.Join(wd, "prefix_test.go"),
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
 		}, matches)
 	})
 

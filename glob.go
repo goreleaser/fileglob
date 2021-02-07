@@ -88,7 +88,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 		prefix = stringSeparator
 		opts = append(opts, func(opts *globOptions) {
 			opts.prefix = prefix
-		})
+		}, WithFs(os.DirFS(prefix)))
 	}
 
 	return doGlob(

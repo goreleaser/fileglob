@@ -23,6 +23,19 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		}, matches)
 	})
 
+	t.Run("real absolute", func(t *testing.T) {
+		t.Parallel()
+
+		abs, err := filepath.Abs(".")
+		require.NoError(t, err)
+		matches, err := Glob(filepath.Join(abs, "*_test.go"))
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			filepath.Join(abs, "glob_test.go"),
+			filepath.Join(abs, "prefix_test.go"),
+		}, matches)
+	})
+
 	t.Run("simple", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("./a/*/*", WithFs(testFs(t, []string{
@@ -240,44 +253,44 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("match files in directories", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("/a/{b,c}", WithFs(testFs(t, []string{
-			"/a/b/d",
-			"/a/b/e/f",
-			"/a/c",
+		matches, err := Glob("a/{b,c}", WithFs(testFs(t, []string{
+			"a/b/d",
+			"a/b/e/f",
+			"a/c",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"/a/b/d",
-			"/a/b/e/f",
-			"/a/c",
+			"a/b/d",
+			"a/b/e/f",
+			"a/c",
 		}, matches)
 	})
 
 	t.Run("match directories directly", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("/a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
-			"/a/b/d",
-			"/a/b/e/f",
-			"/a/c",
+		matches, err := Glob("a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
+			"a/b/d",
+			"a/b/e/f",
+			"a/c",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"/a/b",
-			"/a/c",
+			"a/b",
+			"a/c",
 		}, matches)
 	})
 
 	t.Run("match empty directory", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("/a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
-			"/a/b",
+		matches, err := Glob("a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
+			"a/b",
 		}, []string{
-			"/a/c",
+			"a/c",
 		})))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"/a/b",
-			"/a/c",
+			"a/b",
+			"a/c",
 		}, matches)
 	})
 

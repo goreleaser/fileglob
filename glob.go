@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -74,8 +75,8 @@ func QuoteMeta(pattern string) string {
 
 // toNixPath converts the path to the nix style path
 // Windows style path separators are escape characters so cause issues with the compiled glob.
-func toNixPath(path string) string {
-	return filepath.ToSlash(filepath.Clean(path))
+func toNixPath(s string) string {
+	return path.Clean(filepath.ToSlash(s))
 }
 
 // Glob returns all files that match the given pattern in the current directory.

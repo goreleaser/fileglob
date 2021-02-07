@@ -31,9 +31,10 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		require.NoError(t, err)
 		var opts []OptFunc
 		if runtime.GOOS == "windows" {
-			// should we handle that on Glob too?
-			opts = append(opts, WithFs(os.DirFS(toNixPath(filepath.VolumeName(wd)+`\`))))
+			opts = append(opts, WithFs(os.DirFS(toNixPath(filepath.VolumeName(wd)))))
 		}
+
+		t.Log(toNixPath(filepath.Join(wd, "*_test.go")))
 
 		matches, err := Glob(toNixPath(filepath.Join(wd, "*_test.go")), opts...)
 		require.NoError(t, err)

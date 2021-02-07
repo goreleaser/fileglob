@@ -33,8 +33,10 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 		vol := filepath.VolumeName(wd)
 		if vol != "" {
-			wd = strings.ReplaceAll(wd, vol, strings.ReplaceAll(vol, ":", `\`))
+			wd = filepath.ToSlash(strings.ReplaceAll(wd, vol, strings.ReplaceAll(vol, ":", `\`)))
 		}
+
+		t.Logf("wd: %s", wd)
 
 		matches, err := Glob(filepath.Join(wd, "*_test.go"))
 		require.NoError(t, err)

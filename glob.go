@@ -16,12 +16,9 @@ const (
 	stringSeparator = string(runeSeparator)
 )
 
-// FileSystem is meant to be used with WithFs.
-type FileSystem fs.FS
-
 // globOptions allowed to be passed to Glob.
 type globOptions struct {
-	fs FileSystem
+	fs fs.FS
 
 	// if matchDirectories directly is set to true a matching directory will
 	// be treated just like a matching file. If set to false, a matching directory
@@ -35,7 +32,7 @@ type globOptions struct {
 type OptFunc func(opts *globOptions)
 
 // WithFs allows to provide another fs.FS implementation to Glob.
-func WithFs(f FileSystem) OptFunc {
+func WithFs(f fs.FS) OptFunc {
 	return func(opts *globOptions) {
 		opts.fs = f
 	}

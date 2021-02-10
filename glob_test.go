@@ -24,17 +24,32 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		}, matches)
 	})
 
-	t.Run("real absolute", func(t *testing.T) {
+	t.Run("real with rootfs", func(t *testing.T) {
 		t.Parallel()
 
 		wd, err := os.Getwd()
 		require.NoError(t, err)
 
-		matches, err := Glob(toNixPath(filepath.Join(wd, "*_test.go")))
+		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
+
+		matches, err := Glob(pattern, WithRootFS(pattern))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			toNixPath(filepath.Join(wd, "glob_test.go")),
 			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
+	})
+
+	t.Run("real with rootfs on relative path", func(t *testing.T) {
+		t.Parallel()
+
+		pattern := toNixPath("./*_test.go")
+
+		matches, err := Glob(pattern, WithRootFS(pattern))
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			"glob_test.go",
+			"prefix_test.go",
 		}, matches)
 	})
 

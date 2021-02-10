@@ -39,6 +39,29 @@ func WithFs(f fs.FS) OptFunc {
 	}
 }
 
+// WithRootFS setups fileglob to walk from the root directory (/) or
+// volume (on windows) if the given pattern is an absolute path.
+//
+// Result will also be prepended with the root path or volume.
+func WithRootFS(pattern string) OptFunc {
+	if !filepath.IsAbs(pattern) {
+		return func(opts *globOptions) {}
+	}
+	return func(opts *globOptions) {
+		prefix := ""
+		if strings.HasPrefix(pattern, stringSeparator) {
+			prefix = stringSeparator
+		}
+		if vol := filepath.VolumeName(pattern); vol != "" {
+			prefix = vol + "/"
+		}
+		if prefix != "" {
+			opts.prefix = prefix
+			opts.fs = os.DirFS(prefix)
+		}
+	}
+}
+
 // MatchDirectoryIncludesContents makes a match on a directory match all
 // files inside it as well.
 //
@@ -82,29 +105,13 @@ func toNixPath(s string) string {
 // Glob returns all files that match the given pattern in the current directory.
 // If the given pattern indicates an absolute path, it will glob from `/`.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) {
-	prefix := "./"
-	if strings.HasPrefix(pattern, stringSeparator) {
-		prefix = stringSeparator
-		opts = append(opts, func(opts *globOptions) {
-			opts.prefix = prefix
-		}, WithFs(os.DirFS(prefix)))
-	}
-	if vol := filepath.VolumeName(pattern); vol != "" {
-		prefix = vol + "/"
-		opts = append(opts, func(opts *globOptions) {
-			opts.prefix = prefix
-		}, WithFs(os.DirFS(prefix)))
-	}
-
-	return doGlob(
-		strings.TrimPrefix(pattern, prefix),
-		compileOptions(opts),
-	)
+	return doGlob(pattern, compileOptions(opts))
 }
 
 func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:funlen
 	var matches []string
 
+	pattern = strings.TrimPrefix(pattern, options.prefix)
 	matcher, err := glob.Compile(pattern, runeSeparator)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
@@ -140,7 +147,7 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 		return []string{}, nil
 	}
 
-	return matches, fs.WalkDir(options.fs, prefix, func(path string, info fs.DirEntry, err error) error {
+	err = fs.WalkDir(options.fs, prefix, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -153,7 +160,7 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 
 		if info.IsDir() {
 			if options.matchDirectoriesDirectly {
-				matches = append(matches, options.prefix+path)
+				matches = append(matches, path)
 				return nil
 			}
 
@@ -168,15 +175,17 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 			return fs.SkipDir
 		}
 
-		matches = append(matches, options.prefix+path)
+		matches = append(matches, path)
 
 		return nil
 	})
+	return cleanFilepaths(matches, options.prefix), err
 }
 
 func compileOptions(optFuncs []OptFunc) *globOptions {
 	opts := &globOptions{
-		fs: os.DirFS("."),
+		fs:     os.DirFS("."),
+		prefix: "./",
 	}
 
 	for _, apply := range optFuncs {
@@ -197,7 +206,19 @@ func filesInDirectory(options *globOptions, dir string) ([]string, error) {
 			return nil
 		}
 		path = toNixPath(path)
-		files = append(files, options.prefix+path)
+		files = append(files, path)
 		return nil
 	})
+}
+
+func cleanFilepaths(paths []string, prefix string) []string {
+	if prefix == "./" {
+		// if prefix is relative, no prefix and ./ is the same thing, ignore
+		return paths
+	}
+	var result []string
+	for _, p := range paths {
+		result = append(result, prefix+p)
+	}
+	return result
 }

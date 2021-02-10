@@ -147,39 +147,42 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 		return []string{}, nil
 	}
 
-	return cleanFilepaths(matches, options.prefix),
-		fs.WalkDir(options.fs, prefix, func(path string, info fs.DirEntry, err error) error {
+	if err := fs.WalkDir(options.fs, prefix, func(path string, info fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// The glob ast from github.com/gobwas/glob only works properly with linux paths
+		path = toNixPath(path)
+		if !matcher.Match(path) {
+			return nil
+		}
+
+		if info.IsDir() {
+			if options.matchDirectoriesDirectly {
+				matches = append(matches, path)
+				return nil
+			}
+
+			// a direct match on a directory implies that all files inside
+			// match if options.matchFolders is false
+			filesInDir, err := filesInDirectory(options, path)
 			if err != nil {
 				return err
 			}
 
-			// The glob ast from github.com/gobwas/glob only works properly with linux paths
-			path = toNixPath(path)
-			if !matcher.Match(path) {
-				return nil
-			}
+			matches = append(matches, filesInDir...)
+			return fs.SkipDir
+		}
 
-			if info.IsDir() {
-				if options.matchDirectoriesDirectly {
-					matches = append(matches, path)
-					return nil
-				}
+		matches = append(matches, path)
 
-				// a direct match on a directory implies that all files inside
-				// match if options.matchFolders is false
-				filesInDir, err := filesInDirectory(options, path)
-				if err != nil {
-					return err
-				}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("glob failed: %w", err)
+	}
 
-				matches = append(matches, filesInDir...)
-				return fs.SkipDir
-			}
-
-			matches = append(matches, path)
-
-			return nil
-		})
+	return cleanFilepaths(matches, options.prefix), nil
 }
 
 func compileOptions(optFuncs []OptFunc) *globOptions {
@@ -216,9 +219,9 @@ func cleanFilepaths(paths []string, prefix string) []string {
 		// if prefix is relative, no prefix and ./ is the same thing, ignore
 		return paths
 	}
-	result := make([]string, 0, len(paths))
-	for _, p := range paths {
-		result = append(result, prefix+p)
+	result := make([]string, len(paths))
+	for i, p := range paths {
+		result[i] = prefix + p
 	}
 	return result
 }

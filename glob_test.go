@@ -61,6 +61,20 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		require.Equal(t, "&{fs:. matchDirectoriesDirectly:false prefix:./}", w.String())
 	})
 
+	t.Run("real with rootfs on relative path match dir", func(t *testing.T) {
+		t.Parallel()
+
+		pattern := toNixPath(".github")
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, MaybeRootFS(pattern), MatchDirectoryAsFile, WriteOptions(&w))
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			".github",
+		}, matches)
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./}", w.String())
+	})
+
 	t.Run("simple", func(t *testing.T) {
 		t.Parallel()
 		var w bytes.Buffer

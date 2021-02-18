@@ -63,7 +63,7 @@ func MaybeRootFS(pattern string) OptFunc {
 	}
 }
 
-// WriteOptions write the final option set to the given writer.
+// WriteOptions write the current options to the given writer.
 func WriteOptions(w io.Writer) OptFunc {
 	return func(opts *GlobOptions) {
 		_, _ = fmt.Fprintf(w, "%+v", opts)

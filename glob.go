@@ -3,6 +3,7 @@ package fileglob
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"

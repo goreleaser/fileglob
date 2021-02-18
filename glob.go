@@ -39,11 +39,11 @@ func WithFs(f fs.FS) OptFunc {
 	}
 }
 
-// WithRootFS setups fileglob to walk from the root directory (/) or
+// MaybeRootFS setups fileglob to walk from the root directory (/) or
 // volume (on windows) if the given pattern is an absolute path.
 //
 // Result will also be prepended with the root path or volume.
-func WithRootFS(pattern string) OptFunc {
+func MaybeRootFS(pattern string) OptFunc {
 	if !filepath.IsAbs(pattern) {
 		return func(opts *globOptions) {}
 	}

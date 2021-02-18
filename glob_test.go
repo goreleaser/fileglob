@@ -32,7 +32,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
 
-		matches, err := Glob(pattern, WithRootFS(pattern))
+		matches, err := Glob(pattern, MaybeRootFS(pattern))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			toNixPath(filepath.Join(wd, "glob_test.go")),
@@ -45,7 +45,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 		pattern := toNixPath("./*_test.go")
 
-		matches, err := Glob(pattern, WithRootFS(pattern))
+		matches, err := Glob(pattern, MaybeRootFS(pattern))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			"glob_test.go",

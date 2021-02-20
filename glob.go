@@ -18,8 +18,7 @@ const (
 	stringSeparator = string(runeSeparator)
 )
 
-// GlobOptions allowed to be passed to Glob.
-type GlobOptions struct {
+type globOptions struct {
 	fs fs.FS
 
 	// if matchDirectories directly is set to true a matching directory will
@@ -31,11 +30,11 @@ type GlobOptions struct {
 }
 
 // OptFunc is a function that allow to customize Glob.
-type OptFunc func(opts *GlobOptions)
+type OptFunc func(opts *globOptions)
 
 // WithFs allows to provide another fs.FS implementation to Glob.
 func WithFs(f fs.FS) OptFunc {
-	return func(opts *GlobOptions) {
+	return func(opts *globOptions) {
 		opts.fs = f
 	}
 }
@@ -46,9 +45,9 @@ func WithFs(f fs.FS) OptFunc {
 // Result will also be prepended with the root path or volume.
 func MaybeRootFS(pattern string) OptFunc {
 	if !filepath.IsAbs(pattern) {
-		return func(opts *GlobOptions) {}
+		return func(opts *globOptions) {}
 	}
-	return func(opts *GlobOptions) {
+	return func(opts *globOptions) {
 		prefix := ""
 		if strings.HasPrefix(pattern, stringSeparator) {
 			prefix = stringSeparator
@@ -65,7 +64,7 @@ func MaybeRootFS(pattern string) OptFunc {
 
 // WriteOptions write the current options to the given writer.
 func WriteOptions(w io.Writer) OptFunc {
-	return func(opts *GlobOptions) {
+	return func(opts *globOptions) {
 		_, _ = fmt.Fprintf(w, "%+v", opts)
 	}
 }
@@ -76,14 +75,14 @@ func WriteOptions(w io.Writer) OptFunc {
 // This is the default behavior.
 //
 // Also check MatchDirectoryAsFile.
-func MatchDirectoryIncludesContents(opts *GlobOptions) {
+func MatchDirectoryIncludesContents(opts *globOptions) {
 	opts.matchDirectoriesDirectly = false
 }
 
 // MatchDirectoryAsFile makes a match on a directory match its name only.
 //
 // Also check MatchDirectoryIncludesContents.
-func MatchDirectoryAsFile(opts *GlobOptions) {
+func MatchDirectoryAsFile(opts *globOptions) {
 	opts.matchDirectoriesDirectly = true
 }
 
@@ -93,7 +92,7 @@ func MatchDirectoryAsFile(opts *GlobOptions) {
 //
 // Deprecated: use MatchDirectoryIncludesContents and MatchDirectoryAsFile instead.
 func MatchDirectories(v bool) OptFunc {
-	return func(opts *GlobOptions) {
+	return func(opts *globOptions) {
 		opts.matchDirectoriesDirectly = v
 	}
 }
@@ -116,7 +115,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 	return doGlob(pattern, compileOptions(opts))
 }
 
-func doGlob(pattern string, options *GlobOptions) ([]string, error) { // nolint:funlen
+func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:funlen
 	var matches []string
 
 	pattern = strings.TrimPrefix(pattern, options.prefix)
@@ -193,8 +192,8 @@ func doGlob(pattern string, options *GlobOptions) ([]string, error) { // nolint:
 	return cleanFilepaths(matches, options.prefix), nil
 }
 
-func compileOptions(optFuncs []OptFunc) *GlobOptions {
-	opts := &GlobOptions{
+func compileOptions(optFuncs []OptFunc) *globOptions {
+	opts := &globOptions{
 		fs:     os.DirFS("."),
 		prefix: "./",
 	}
@@ -206,7 +205,7 @@ func compileOptions(optFuncs []OptFunc) *GlobOptions {
 	return opts
 }
 
-func filesInDirectory(options *GlobOptions, dir string) ([]string, error) {
+func filesInDirectory(options *globOptions, dir string) ([]string, error) {
 	var files []string
 
 	return files, fs.WalkDir(options.fs, dir, func(path string, info fs.DirEntry, err error) error {

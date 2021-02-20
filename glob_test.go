@@ -34,6 +34,11 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		wd, err := os.Getwd()
 		require.NoError(t, err)
 
+		prefix := "/"
+		if runtime.GOOS == "windows" {
+			prefix = filepath.VolumeName(wd) + "/"
+		}
+
 		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
 
 		var w bytes.Buffer
@@ -43,7 +48,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			toNixPath(filepath.Join(wd, "glob_test.go")),
 			toNixPath(filepath.Join(wd, "prefix_test.go")),
 		}, matches)
-		require.Equal(t, "&{fs:/ matchDirectoriesDirectly:false prefix:/}", w.String())
+		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s}", prefix, prefix), w.String())
 	})
 
 	t.Run("real with rootfs on relative path", func(t *testing.T) {

@@ -111,12 +111,9 @@ func toNixPath(s string) string {
 
 // Glob returns all files that match the given pattern in the current directory.
 // If the given pattern indicates an absolute path, it will glob from `/`.
-func Glob(pattern string, opts ...OptFunc) ([]string, error) {
-	return doGlob(pattern, compileOptions(opts))
-}
-
-func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:funlen
+func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen
 	var matches []string
+	options := compileOptions(opts)
 
 	pattern = strings.TrimPrefix(pattern, options.prefix)
 	matcher, err := glob.Compile(pattern, runeSeparator)

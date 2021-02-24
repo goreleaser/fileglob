@@ -386,7 +386,7 @@ func TestQuoteMeta(t *testing.T) {
 		"a/c",
 		"b/c",
 		"{a,b}/c",
-	}, nil)), WriteOptions(os.Stderr))
+	}, nil)))
 	require.NoError(t, err)
 	require.Equal(t, []string{
 		"{a,b}/c",

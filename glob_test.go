@@ -34,19 +34,19 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		wd, err := os.Getwd()
 		require.NoError(t, err)
 
-		prefix := stringSeparator
+		prefix := "/"
 		if runtime.GOOS == "windows" {
-			prefix = filepath.VolumeName(wd) + stringSeparator
+			prefix = filepath.VolumeName(wd) + "/"
 		}
 
-		pattern := filepath.ToSlash(filepath.Join(wd, "*_test.go"))
+		pattern := filepath.Join(wd, "*_test.go")
 
 		var w bytes.Buffer
 		matches, err := Glob(pattern, MaybeRootFS(pattern), WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			filepath.ToSlash(filepath.Join(wd, "glob_test.go")),
-			filepath.ToSlash(filepath.Join(wd, "prefix_test.go")),
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
 		}, matches)
 		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s}", prefix, prefix), w.String())
 	})
@@ -386,7 +386,7 @@ func TestQuoteMeta(t *testing.T) {
 		"a/c",
 		"b/c",
 		"{a,b}/c",
-	}, nil)))
+	}, nil)), WriteOptions(os.Stderr))
 	require.NoError(t, err)
 	require.Equal(t, []string{
 		"{a,b}/c",

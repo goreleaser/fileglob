@@ -115,7 +115,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 	var matches []string
 	options := compileOptions(opts)
 
-	pattern = strings.TrimPrefix(pattern, options.prefix)
+	pattern = toNixPath(strings.TrimPrefix(pattern, options.prefix))
 	matcher, err := glob.Compile(pattern, runeSeparator)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)

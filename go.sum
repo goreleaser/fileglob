@@ -1,5 +1,5 @@
-github.com/caarlos0/testfs v0.4.2 h1:OiiZpWdjkBqXlARwldatI2Pm388Zr8yIpIDOuiVIJ24=
-github.com/caarlos0/testfs v0.4.2/go.mod h1:bRN55zgG4XCUVVHZCeU+/Tz1Q6AxEJOEJTliBy+1DMk=
+github.com/caarlos0/testfs v0.4.3 h1:q1zEM5hgsssqWanAfevJYYa0So60DdK6wlJeTc/yfUE=
+github.com/caarlos0/testfs v0.4.3/go.mod h1:bRN55zgG4XCUVVHZCeU+/Tz1Q6AxEJOEJTliBy+1DMk=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

@@ -18,6 +18,19 @@ const (
 	stringSeparator = string(runeSeparator)
 )
 
+type globFS struct {
+	fs.FS
+	// prefix string
+	wd string
+}
+
+func (t globFS) Open(name string) (fs.File, error) {
+	if filepath.IsAbs(name) {
+		return t.FS.Open(strings.TrimLeft(name, stringSeparator))
+	}
+	return t.Open(filepath.Join(t.wd, name))
+}
+
 type globOptions struct {
 	fs fs.FS
 
@@ -26,7 +39,7 @@ type globOptions struct {
 	// will auto-match all files inside instead of the directory itself.
 	matchDirectoriesDirectly bool
 
-	prefix string
+	// prefix string
 }
 
 // OptFunc is a function that allow to customize Glob.
@@ -44,22 +57,22 @@ func WithFs(f fs.FS) OptFunc {
 //
 // Result will also be prepended with the root path or volume.
 func MaybeRootFS(pattern string) OptFunc {
-	if !filepath.IsAbs(pattern) {
-		return func(opts *globOptions) {}
-	}
-	return func(opts *globOptions) {
-		prefix := ""
-		if strings.HasPrefix(pattern, stringSeparator) {
-			prefix = stringSeparator
-		}
-		if vol := filepath.VolumeName(pattern); vol != "" {
-			prefix = vol + stringSeparator
-		}
-		if prefix != "" {
-			opts.prefix = toNixPath(prefix)
-			opts.fs = os.DirFS(opts.prefix)
-		}
-	}
+	// if !filepath.IsAbs(pattern) {
+	return func(opts *globOptions) {}
+	//}
+	//return func(opts *globOptions) {
+	//	prefix := ""
+	//	if strings.HasPrefix(pattern, stringSeparator) {
+	//		prefix = stringSeparator
+	//	}
+	//	if vol := filepath.VolumeName(pattern); vol != "" {
+	//		prefix = vol + stringSeparator
+	//	}
+	//	if prefix != "" {
+	//		opts.prefix = toNixPath(prefix)
+	//		opts.fs = os.DirFS(opts.prefix)
+	//	}
+	//}
 }
 
 // WriteOptions write the current options to the given writer.
@@ -115,7 +128,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 	var matches []string
 	options := compileOptions(opts)
 
-	pattern = strings.TrimPrefix(toNixPath(pattern), options.prefix)
+	pattern = toNixPath(pattern)
 	matcher, err := glob.Compile(pattern, runeSeparator)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
@@ -186,13 +199,23 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 		return nil, fmt.Errorf("glob failed: %w", err)
 	}
 
-	return cleanFilepaths(matches, options.prefix), nil
+	return matches, nil
 }
 
 func compileOptions(optFuncs []OptFunc) *globOptions {
+	wd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	root := "/"
+	if vol := filepath.VolumeName(wd); vol != "" {
+		root = vol + stringSeparator
+	}
 	opts := &globOptions{
-		fs:     os.DirFS("."),
-		prefix: "./",
+		fs: globFS{
+			FS: os.DirFS(root),
+			wd: wd,
+		},
 	}
 
 	for _, apply := range optFuncs {
@@ -216,16 +239,4 @@ func filesInDirectory(options *globOptions, dir string) ([]string, error) {
 		files = append(files, path)
 		return nil
 	})
-}
-
-func cleanFilepaths(paths []string, prefix string) []string {
-	if prefix == "./" {
-		// if prefix is relative, no prefix and ./ is the same thing, ignore
-		return paths
-	}
-	result := make([]string, len(paths))
-	for i, p := range paths {
-		result[i] = prefix + p
-	}
-	return result
 }

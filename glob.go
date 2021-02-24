@@ -55,7 +55,7 @@ func MaybeRootFS(pattern string) OptFunc {
 			prefix = vol + stringSeparator
 		}
 		if prefix != "" {
-			opts.prefix = toNixPath(prefix)
+			opts.prefix = prefix
 			opts.fs = os.DirFS(opts.prefix)
 		}
 	}
@@ -102,11 +102,11 @@ func QuoteMeta(pattern string) string {
 	return glob.QuoteMeta(pattern)
 }
 
-// toNixPath converts the path to the nix style path
-// Windows style path separators are escape characters so cause issues with the compiled glob.
-func toNixPath(s string) string {
-	return filepath.ToSlash(filepath.Clean(s))
-}
+//// toNixPath converts the path to the nix style path
+//// Windows style path separators are escape characters so cause issues with the compiled glob.
+//func toNixPath(s string) string {
+//	return filepath.ToSlash(filepath.Clean(s))
+//}
 
 // Glob returns all files that match the given pattern in the current directory.
 // If the given pattern indicates an absolute path, it will glob from `/`.
@@ -114,7 +114,8 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 	var matches []string
 	options := compileOptions(opts)
 
-	pattern = strings.TrimPrefix(toNixPath(pattern), options.prefix)
+	pattern = filepath.Clean(strings.TrimPrefix(pattern, options.prefix))
+
 	matcher, err := glob.Compile(pattern, runeSeparator)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
@@ -156,7 +157,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 		}
 
 		// The glob ast from github.com/gobwas/glob only works properly with linux paths
-		path = toNixPath(path)
+		// path = toNixPath(path)
 		if !matcher.Match(path) {
 			return nil
 		}
@@ -211,7 +212,7 @@ func filesInDirectory(options *globOptions, dir string) ([]string, error) {
 		if info.IsDir() {
 			return nil
 		}
-		path = toNixPath(path)
+		// path = toNixPath(path)
 		files = append(files, path)
 		return nil
 	})

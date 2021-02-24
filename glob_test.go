@@ -381,11 +381,12 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 func TestQuoteMeta(t *testing.T) {
 	t.Parallel()
+
 	matches, err := Glob(QuoteMeta("{a,b}/c"), WithFs(testFs(t, []string{
 		"a/c",
 		"b/c",
 		"{a,b}/c",
-	}, nil)))
+	}, nil)), WriteOptions(os.Stderr))
 	require.NoError(t, err)
 	require.Equal(t, []string{
 		"{a,b}/c",

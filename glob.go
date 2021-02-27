@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -52,11 +53,11 @@ func MaybeRootFS(pattern string) OptFunc {
 			prefix = stringSeparator
 		}
 		if vol := filepath.VolumeName(pattern); vol != "" {
-			prefix = vol + stringSeparator
+			prefix = vol + "/"
 		}
 		if prefix != "" {
-			opts.prefix = toNixPath(prefix)
-			opts.fs = os.DirFS(opts.prefix)
+			opts.prefix = prefix
+			opts.fs = os.DirFS(prefix)
 		}
 	}
 }
@@ -105,7 +106,7 @@ func QuoteMeta(pattern string) string {
 // toNixPath converts the path to the nix style path
 // Windows style path separators are escape characters so cause issues with the compiled glob.
 func toNixPath(s string) string {
-	return filepath.ToSlash(filepath.Clean(s))
+	return path.Clean(filepath.ToSlash(s))
 }
 
 // Glob returns all files that match the given pattern in the current directory.
@@ -114,7 +115,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 	var matches []string
 	options := compileOptions(opts)
 
-	pattern = strings.TrimPrefix(toNixPath(pattern), options.prefix)
+	pattern = toNixPath(strings.TrimPrefix(pattern, options.prefix))
 	matcher, err := glob.Compile(pattern, runeSeparator)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)

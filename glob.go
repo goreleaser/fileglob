@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -103,7 +102,6 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 	var matches []string
 
 	if strings.HasPrefix(pattern, "../") {
-		log.Println("resolving", pattern)
 		p, err := filepath.Abs(pattern)
 		if err != nil {
 			return matches, err

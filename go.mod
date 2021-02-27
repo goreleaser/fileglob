@@ -1,6 +1,6 @@
-module github.com/goreleaser/fileglob
+module github.com/goreleaser/fileglob/v1
 
-go 1.15
+go 1.16
 
 require (
 	github.com/caarlos0/testfs v0.4.3

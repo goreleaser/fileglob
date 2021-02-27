@@ -1,13 +1,16 @@
 package fileglob
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/gobwas/glob"
-	"github.com/spf13/afero"
 )
 
 const (
@@ -15,26 +18,54 @@ const (
 	separatorString = string(separatorRune)
 )
 
-// FileSystem is meant to be used with WithFs.
-type FileSystem afero.Fs
-
-// globOptions allowed to be passed to Glob.
 type globOptions struct {
-	fs afero.Fs
+	fs fs.FS
 
 	// if matchDirectories directly is set to true a matching directory will
 	// be treated just like a matching file. If set to false, a matching directory
 	// will auto-match all files inside instead of the directory itself.
 	matchDirectoriesDirectly bool
+
+	prefix string
 }
 
 // OptFunc is a function that allow to customize Glob.
 type OptFunc func(opts *globOptions)
 
-// WithFs allows to provide another afero.Fs implementation to Glob.
-func WithFs(fs FileSystem) OptFunc {
+// WithFs allows to provide another fs.FS implementation to Glob.
+func WithFs(f fs.FS) OptFunc {
 	return func(opts *globOptions) {
-		opts.fs = fs
+		opts.fs = f
+	}
+}
+
+// MaybeRootFS setups fileglob to walk from the root directory (/) or
+// volume (on windows) if the given pattern is an absolute path.
+//
+// Result will also be prepended with the root path or volume.
+func MaybeRootFS(pattern string) OptFunc {
+	if !filepath.IsAbs(pattern) {
+		return func(opts *globOptions) {}
+	}
+	return func(opts *globOptions) {
+		prefix := ""
+		if strings.HasPrefix(pattern, separatorString) {
+			prefix = separatorString
+		}
+		if vol := filepath.VolumeName(pattern); vol != "" {
+			prefix = vol + "/"
+		}
+		if prefix != "" {
+			opts.prefix = prefix
+			opts.fs = os.DirFS(prefix)
+		}
+	}
+}
+
+// WriteOptions write the current options to the given writer.
+func WriteOptions(w io.Writer) OptFunc {
+	return func(opts *globOptions) {
+		_, _ = fmt.Fprintf(w, "%+v", opts)
 	}
 }
 
@@ -63,22 +94,17 @@ func QuoteMeta(pattern string) string {
 
 // toNixPath converts the path to the nix style path
 // Windows style path separators are escape characters so cause issues with the compiled glob.
-func toNixPath(path string) string {
-	return filepath.ToSlash(filepath.Clean(path))
+func toNixPath(s string) string {
+	return path.Clean(filepath.ToSlash(s))
 }
 
 // Glob returns all files that match the given pattern in the current directory.
-func Glob(pattern string, opts ...OptFunc) ([]string, error) {
-	return doGlob(
-		strings.TrimPrefix(pattern, "."+separatorString),
-		compileOptions(opts),
-	)
-}
-
-func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:funlen
-	fs := options.fs
+// If the given pattern indicates an absolute path, it will glob from `/`.
+func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,cyclop
 	var matches []string
+	options := compileOptions(opts)
 
+	pattern = strings.TrimSuffix(strings.TrimPrefix(pattern, options.prefix), separatorString)
 	matcher, err := glob.Compile(pattern, separatorRune)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
@@ -89,13 +115,13 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 		return nil, fmt.Errorf("cannot determine static prefix: %w", err)
 	}
 
-	prefixInfo, err := fs.Stat(prefix)
-	if os.IsNotExist(err) {
+	prefixInfo, err := fs.Stat(options.fs, prefix)
+	if errors.Is(err, fs.ErrNotExist) {
 		if !ContainsMatchers(pattern) {
 			// glob contains no dynamic matchers so prefix is the file name that
 			// the glob references directly. When the glob explicitly references
 			// a single non-existing file, return an error for the user to check.
-			return []string{}, fmt.Errorf(`matching "%s": %w`, prefix, os.ErrNotExist)
+			return []string{}, fmt.Errorf(`matching "%s": %w`, prefix, fs.ErrNotExist)
 		}
 
 		return []string{}, nil
@@ -114,7 +140,7 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 		return []string{}, nil
 	}
 
-	return matches, afero.Walk(fs, prefix, func(path string, info os.FileInfo, err error) error {
+	if err := fs.WalkDir(options.fs, prefix, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -133,24 +159,29 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 
 			// a direct match on a directory implies that all files inside
 			// match if options.matchFolders is false
-			filesInDir, err := filesInDirectory(fs, path)
+			filesInDir, err := filesInDirectory(options, path)
 			if err != nil {
 				return err
 			}
 
 			matches = append(matches, filesInDir...)
-			return filepath.SkipDir
+			return fs.SkipDir
 		}
 
 		matches = append(matches, path)
 
 		return nil
-	})
+	}); err != nil {
+		return nil, fmt.Errorf("glob failed: %w", err)
+	}
+
+	return cleanFilepaths(matches, options.prefix), nil
 }
 
 func compileOptions(optFuncs []OptFunc) *globOptions {
 	opts := &globOptions{
-		fs: afero.NewOsFs(),
+		fs:     os.DirFS("."),
+		prefix: "./",
 	}
 
 	for _, apply := range optFuncs {
@@ -160,10 +191,10 @@ func compileOptions(optFuncs []OptFunc) *globOptions {
 	return opts
 }
 
-func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {
+func filesInDirectory(options *globOptions, dir string) ([]string, error) {
 	var files []string
 
-	return files, afero.Walk(fs, dir, func(path string, info os.FileInfo, err error) error {
+	return files, fs.WalkDir(options.fs, dir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -174,4 +205,16 @@ func filesInDirectory(fs afero.Fs, dir string) ([]string, error) {
 		files = append(files, path)
 		return nil
 	})
+}
+
+func cleanFilepaths(paths []string, prefix string) []string {
+	if prefix == "./" {
+		// if prefix is relative, no prefix and ./ is the same thing, ignore
+		return paths
+	}
+	result := make([]string, len(paths))
+	for i, p := range paths {
+		result[i] = prefix + p
+	}
+	return result
 }

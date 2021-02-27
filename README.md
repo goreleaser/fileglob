@@ -26,7 +26,7 @@ and returns only matching files or direcories, depending on the configuration. D
 * Nested globbing (`{a,[bc]}`)
 * Escapable wildcards (`\{a\}/\*` and `fileglob.QuoteMeta(pattern)`)
 
-By also building on top of [spf13/afero](https://github.com/spf13/afero), a range of alternative filesystems as well as custom filesystems are supported. For example, an in-memory filesystem can be used (`fileglob.Glob("/a/b", fileglob.WithFs(afero.NewMemMapFs()))`):
+By also building on top of `fs.FS`, a range of alternative filesystems as well as custom filesystems are supported.
 
 ## Why
 

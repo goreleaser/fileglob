@@ -1,12 +1,16 @@
 package fileglob
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
-	"github.com/spf13/afero"
+	"github.com/caarlos0/testfs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,24 +18,94 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Parallel()
 	t.Run("real", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("*_test.go")
+		var w bytes.Buffer
+		matches, err := Glob("*_test.go", WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			"glob_test.go",
 			"prefix_test.go",
 		}, matches)
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:false prefix:./}", w.String())
+	})
+
+	t.Run("real with rootfs", func(t *testing.T) {
+		t.Parallel()
+
+		wd, err := os.Getwd()
+		require.NoError(t, err)
+
+		prefix := "/"
+		if runtime.GOOS == "windows" {
+			prefix = filepath.VolumeName(wd) + "/"
+		}
+
+		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, MaybeRootFS(pattern), WriteOptions(&w))
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
+		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s}", prefix, prefix), w.String())
+	})
+
+	t.Run("real with rootfs on relative path", func(t *testing.T) {
+		t.Parallel()
+
+		pattern := "./*_test.go"
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, MaybeRootFS(pattern), WriteOptions(&w))
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			"glob_test.go",
+			"prefix_test.go",
+		}, matches)
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:false prefix:./}", w.String())
+	})
+
+	t.Run("real with rootfs on relative path match dir", func(t *testing.T) {
+		t.Parallel()
+
+		pattern := ".github"
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, MaybeRootFS(pattern), MatchDirectoryAsFile, WriteOptions(&w))
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			".github",
+		}, matches)
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./}", w.String())
+	})
+
+	t.Run("real with rootfs on relative path match dir", func(t *testing.T) {
+		t.Parallel()
+
+		pattern := ".github/workflows/"
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, MaybeRootFS(pattern), MatchDirectoryAsFile, WriteOptions(&w))
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			".github/workflows",
+		}, matches)
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./}", w.String())
 	})
 
 	t.Run("simple", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("./a/*/*", WithFs(testFs(t, []string{
+		var w bytes.Buffer
+		fsys := testFs(t, []string{
 			"./c/file1.txt",
 			"./a/nope/file1.txt",
 			"./a/something",
 			"./a/b/file1.txt",
 			"./a/c/file2.txt",
 			"./a/d/file1.txt",
-		}, nil)))
+		}, nil)
+		matches, err := Glob("./a/*/*", WithFs(fsys), WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			"a/b/file1.txt",
@@ -39,6 +113,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"a/d/file1.txt",
 			"a/nope/file1.txt",
 		}, matches)
+		require.Equal(t, fmt.Sprintf("&{fs:%+v matchDirectoriesDirectly:false prefix:./}", fsys), w.String())
 	})
 
 	t.Run("single file", func(t *testing.T) {
@@ -195,6 +270,9 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("escaped asterisk", func(t *testing.T) {
 		t.Parallel()
+		if runtime.GOOS == "windows" {
+			t.Skip("can't create paths with * on Windows")
+		}
 		matches, err := Glob("a/\\*/b", WithFs(testFs(t, []string{
 			"a/a/b",
 			"a/*/b",
@@ -239,44 +317,44 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("match files in directories", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("/a/{b,c}", WithFs(testFs(t, []string{
-			"/a/b/d",
-			"/a/b/e/f",
-			"/a/c",
+		matches, err := Glob("a/{b,c}", WithFs(testFs(t, []string{
+			"a/b/d",
+			"a/b/e/f",
+			"a/c",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"/a/b/d",
-			"/a/b/e/f",
-			"/a/c",
+			"a/b/d",
+			"a/b/e/f",
+			"a/c",
 		}, matches)
 	})
 
 	t.Run("match directories directly", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("/a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
-			"/a/b/d",
-			"/a/b/e/f",
-			"/a/c",
+		matches, err := Glob("a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
+			"a/b/d",
+			"a/b/e/f",
+			"a/c",
 		}, nil)))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"/a/b",
-			"/a/c",
+			"a/b",
+			"a/c",
 		}, matches)
 	})
 
 	t.Run("match empty directory", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob("/a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
-			"/a/b",
+		matches, err := Glob("a/{b,c}", MatchDirectoryAsFile, WithFs(testFs(t, []string{
+			"a/b",
 		}, []string{
-			"/a/c",
+			"a/c",
 		})))
 		require.NoError(t, err)
 		require.Equal(t, []string{
-			"/a/b",
-			"/a/c",
+			"a/b",
+			"a/c",
 		}, matches)
 	})
 
@@ -314,19 +392,18 @@ func TestQuoteMeta(t *testing.T) {
 	}, matches)
 }
 
-func testFs(tb testing.TB, files, dirs []string) afero.Fs {
+func testFs(tb testing.TB, files, dirs []string) fs.FS {
 	tb.Helper()
 
-	tmpfs := afero.NewMemMapFs()
+	tmpfs := testfs.New(tb)
 
 	for _, file := range files {
-		if _, err := tmpfs.Create(filepath.FromSlash(file)); err != nil {
-			require.NoError(tb, err)
-		}
+		require.NoError(tb, tmpfs.MkdirAll(filepath.Dir(file), 0o764))
+		require.NoError(tb, tmpfs.WriteFile(file, []byte(file), 0o654))
 	}
 
 	for _, dir := range dirs {
-		require.NoError(tb, tmpfs.MkdirAll(filepath.FromSlash(dir), 0o664))
+		require.NoError(tb, tmpfs.MkdirAll(dir, 0o764))
 	}
 
 	return tmpfs

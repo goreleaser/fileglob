@@ -55,17 +55,6 @@ func MatchDirectoryAsFile(opts *globOptions) {
 	opts.matchDirectoriesDirectly = true
 }
 
-// MatchDirectories determines weather a matching directory should
-// result in only the folder name itself being returned (true) or
-// in all files inside that folder being returned (false).
-//
-// Deprecated: use MatchDirectoryIncludesContents and MatchDirectoryAsFile instead.
-func MatchDirectories(v bool) OptFunc {
-	return func(opts *globOptions) {
-		opts.matchDirectoriesDirectly = v
-	}
-}
-
 // QuoteMeta returns a string that quotes all glob pattern meta characters
 // inside the argument text; For example, QuoteMeta(`{foo*}`) returns `\{foo\*\}`.
 func QuoteMeta(pattern string) string {

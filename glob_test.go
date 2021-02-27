@@ -42,7 +42,32 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
 
 		var w bytes.Buffer
-		matches, err := Glob(pattern, MaybeRootFS(pattern), WriteOptions(&w))
+		matches, err := Glob(pattern, MaybeRootFS, WriteOptions(&w))
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
+		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s}", prefix, prefix), w.String())
+	})
+
+	t.Run("real with rootfs on relative path to parent", func(t *testing.T) {
+		t.Parallel()
+
+		wd, err := os.Getwd()
+		require.NoError(t, err)
+
+		dir := filepath.Base(wd)
+
+		prefix := "/"
+		if runtime.GOOS == "windows" {
+			prefix = filepath.VolumeName(wd) + "/"
+		}
+
+		pattern := "../" + dir + "/*_test.go"
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, MaybeRootFS, WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			toNixPath(filepath.Join(wd, "glob_test.go")),
@@ -57,7 +82,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		pattern := "./*_test.go"
 
 		var w bytes.Buffer
-		matches, err := Glob(pattern, MaybeRootFS(pattern), WriteOptions(&w))
+		matches, err := Glob(pattern, MaybeRootFS, WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			"glob_test.go",
@@ -72,7 +97,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		pattern := ".github"
 
 		var w bytes.Buffer
-		matches, err := Glob(pattern, MaybeRootFS(pattern), MatchDirectoryAsFile, WriteOptions(&w))
+		matches, err := Glob(pattern, MaybeRootFS, MatchDirectoryAsFile, WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			".github",
@@ -86,7 +111,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		pattern := ".github/workflows/"
 
 		var w bytes.Buffer
-		matches, err := Glob(pattern, MaybeRootFS(pattern), MatchDirectoryAsFile, WriteOptions(&w))
+		matches, err := Glob(pattern, MaybeRootFS, MatchDirectoryAsFile, WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			".github/workflows",

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,11 +31,11 @@ type globOptions struct {
 }
 
 // OptFunc is a function that allow to customize Glob.
-type OptFunc func(opts *globOptions)
+type OptFunc func(opts *globOptions, pattern string)
 
 // WithFs allows to provide another fs.FS implementation to Glob.
 func WithFs(f fs.FS) OptFunc {
-	return func(opts *globOptions) {
+	return func(opts *globOptions, _ string) {
 		opts.fs = f
 	}
 }
@@ -43,28 +44,26 @@ func WithFs(f fs.FS) OptFunc {
 // volume (on windows) if the given pattern is an absolute path.
 //
 // Result will also be prepended with the root path or volume.
-func MaybeRootFS(pattern string) OptFunc {
+func MaybeRootFS(opts *globOptions, pattern string) {
 	if !filepath.IsAbs(pattern) {
-		return func(opts *globOptions) {}
+		return
 	}
-	return func(opts *globOptions) {
-		prefix := ""
-		if strings.HasPrefix(pattern, separatorString) {
-			prefix = separatorString
-		}
-		if vol := filepath.VolumeName(pattern); vol != "" {
-			prefix = vol + "/"
-		}
-		if prefix != "" {
-			opts.prefix = prefix
-			opts.fs = os.DirFS(prefix)
-		}
+	prefix := ""
+	if strings.HasPrefix(pattern, separatorString) {
+		prefix = separatorString
+	}
+	if vol := filepath.VolumeName(pattern); vol != "" {
+		prefix = vol + "/"
+	}
+	if prefix != "" {
+		opts.prefix = prefix
+		opts.fs = os.DirFS(prefix)
 	}
 }
 
 // WriteOptions write the current options to the given writer.
 func WriteOptions(w io.Writer) OptFunc {
-	return func(opts *globOptions) {
+	return func(opts *globOptions, _ string) {
 		_, _ = fmt.Fprintf(w, "%+v", opts)
 	}
 }
@@ -75,14 +74,14 @@ func WriteOptions(w io.Writer) OptFunc {
 // This is the default behavior.
 //
 // Also check MatchDirectoryAsFile.
-func MatchDirectoryIncludesContents(opts *globOptions) {
+func MatchDirectoryIncludesContents(opts *globOptions, _ string) {
 	opts.matchDirectoriesDirectly = false
 }
 
 // MatchDirectoryAsFile makes a match on a directory match its name only.
 //
 // Also check MatchDirectoryIncludesContents.
-func MatchDirectoryAsFile(opts *globOptions) {
+func MatchDirectoryAsFile(opts *globOptions, _ string) {
 	opts.matchDirectoriesDirectly = true
 }
 
@@ -102,7 +101,17 @@ func toNixPath(s string) string {
 // If the given pattern indicates an absolute path, it will glob from `/`.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,cyclop
 	var matches []string
-	options := compileOptions(opts)
+
+	if strings.HasPrefix(pattern, "../") {
+		log.Println("resolving", pattern)
+		p, err := filepath.Abs(pattern)
+		if err != nil {
+			return matches, err
+		}
+		pattern = p
+	}
+
+	options := compileOptions(opts, pattern)
 
 	pattern = strings.TrimSuffix(strings.TrimPrefix(pattern, options.prefix), separatorString)
 	matcher, err := glob.Compile(pattern, separatorRune)
@@ -178,14 +187,14 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 	return cleanFilepaths(matches, options.prefix), nil
 }
 
-func compileOptions(optFuncs []OptFunc) *globOptions {
+func compileOptions(optFuncs []OptFunc, pattern string) *globOptions {
 	opts := &globOptions{
 		fs:     os.DirFS("."),
 		prefix: "./",
 	}
 
 	for _, apply := range optFuncs {
-		apply(opts)
+		apply(opts, pattern)
 	}
 
 	return opts

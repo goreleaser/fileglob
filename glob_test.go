@@ -54,7 +54,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("real with rootfs on relative path", func(t *testing.T) {
 		t.Parallel()
 
-		pattern := toNixPath("./*_test.go")
+		pattern := "./*_test.go"
 
 		var w bytes.Buffer
 		matches, err := Glob(pattern, MaybeRootFS(pattern), WriteOptions(&w))
@@ -69,13 +69,27 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("real with rootfs on relative path match dir", func(t *testing.T) {
 		t.Parallel()
 
-		pattern := toNixPath(".github")
+		pattern := ".github"
 
 		var w bytes.Buffer
 		matches, err := Glob(pattern, MaybeRootFS(pattern), MatchDirectoryAsFile, WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			".github",
+		}, matches)
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./}", w.String())
+	})
+
+	t.Run("real with rootfs on relative path match dir", func(t *testing.T) {
+		t.Parallel()
+
+		pattern := ".github/workflows/"
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, MaybeRootFS(pattern), MatchDirectoryAsFile, WriteOptions(&w))
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			".github/workflows",
 		}, matches)
 		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./}", w.String())
 	})

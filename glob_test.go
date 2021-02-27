@@ -39,7 +39,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			prefix = filepath.VolumeName(wd) + "/"
 		}
 
-		pattern := filepath.Join(wd, "*_test.go")
+		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
 
 		var w bytes.Buffer
 		matches, err := Glob(pattern, MaybeRootFS(pattern), WriteOptions(&w))
@@ -54,7 +54,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("real with rootfs on relative path", func(t *testing.T) {
 		t.Parallel()
 
-		pattern := "./*_test.go"
+		pattern := toNixPath("./*_test.go")
 
 		var w bytes.Buffer
 		matches, err := Glob(pattern, MaybeRootFS(pattern), WriteOptions(&w))
@@ -69,21 +69,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("real with rootfs on relative path match dir", func(t *testing.T) {
 		t.Parallel()
 
-		pattern := ".github"
-
-		var w bytes.Buffer
-		matches, err := Glob(pattern, MaybeRootFS(pattern), MatchDirectoryAsFile, WriteOptions(&w))
-		require.NoError(t, err)
-		require.Equal(t, []string{
-			".github",
-		}, matches)
-		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./}", w.String())
-	})
-
-	t.Run("real with rootfs on relative path match dir with trailing slash", func(t *testing.T) {
-		t.Parallel()
-
-		pattern := ".github/"
+		pattern := toNixPath(".github")
 
 		var w bytes.Buffer
 		matches, err := Glob(pattern, MaybeRootFS(pattern), MatchDirectoryAsFile, WriteOptions(&w))

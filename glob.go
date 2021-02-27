@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	runeSeparator   = '/'
-	stringSeparator = string(runeSeparator)
+	separatorRune   = '/'
+	separatorString = string(separatorRune)
 )
 
 type globOptions struct {
@@ -49,8 +49,8 @@ func MaybeRootFS(pattern string) OptFunc {
 	}
 	return func(opts *globOptions) {
 		prefix := ""
-		if strings.HasPrefix(pattern, stringSeparator) {
-			prefix = stringSeparator
+		if strings.HasPrefix(pattern, separatorString) {
+			prefix = separatorString
 		}
 		if vol := filepath.VolumeName(pattern); vol != "" {
 			prefix = vol + "/"
@@ -115,8 +115,8 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 	var matches []string
 	options := compileOptions(opts)
 
-	pattern = filepath.Clean(strings.TrimPrefix(pattern, options.prefix))
-	matcher, err := glob.Compile(pattern, runeSeparator)
+	pattern = strings.TrimSuffix(strings.TrimPrefix(pattern, options.prefix), separatorString)
+	matcher, err := glob.Compile(pattern, separatorRune)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
 	}

@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	runeSeparator   = '/'
-	stringSeparator = string(runeSeparator)
+	separatorRune   = '/'
+	separatorString = string(separatorRune)
 )
 
 // FileSystem is meant to be used with WithFs.
@@ -70,7 +70,7 @@ func toNixPath(path string) string {
 // Glob returns all files that match the given pattern in the current directory.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) {
 	return doGlob(
-		strings.TrimPrefix(pattern, "."+stringSeparator),
+		strings.TrimPrefix(pattern, "."+separatorString),
 		compileOptions(opts),
 	)
 }
@@ -79,7 +79,7 @@ func doGlob(pattern string, options *globOptions) ([]string, error) { // nolint:
 	fs := options.fs
 	var matches []string
 
-	matcher, err := glob.Compile(pattern, runeSeparator)
+	matcher, err := glob.Compile(pattern, separatorRune)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
 	}

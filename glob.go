@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -100,13 +99,13 @@ func MatchDirectories(v bool) OptFunc {
 // QuoteMeta returns a string that quotes all glob pattern meta characters
 // inside the argument text; For example, QuoteMeta(`{foo*}`) returns `\{foo\*\}`.
 func QuoteMeta(pattern string) string {
-	return glob.QuoteMeta(toNixPath(pattern))
+	return glob.QuoteMeta(pattern)
 }
 
 // toNixPath converts the path to the nix style path
 // Windows style path separators are escape characters so cause issues with the compiled glob.
 func toNixPath(s string) string {
-	return path.Clean(filepath.ToSlash(s))
+	return filepath.ToSlash(filepath.Clean(s))
 }
 
 // Glob returns all files that match the given pattern in the current directory.

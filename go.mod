@@ -1,4 +1,4 @@
-module github.com/goreleaser/fileglob/v1
+module github.com/goreleaser/fileglob
 
 go 1.16
 

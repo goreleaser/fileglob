@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -96,7 +94,7 @@ func QuoteMeta(pattern string) string {
 // toNixPath converts the path to the nix style path
 // Windows style path separators are escape characters so cause issues with the compiled glob.
 func toNixPath(s string) string {
-	return path.Clean(filepath.ToSlash(s))
+	return filepath.ToSlash(filepath.Clean(s))
 }
 
 // Glob returns all files that match the given pattern in the current directory.
@@ -113,19 +111,10 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 		pattern = p
 	}
 
-	log.Printf(
-		"filepath=%s, toslash=%s, clean=%s, toslash(clean)=%s, clean(toslash)=%s, tonixpath=%s",
-		pattern,
-		filepath.ToSlash(pattern),
-		filepath.Clean(pattern),
-		filepath.ToSlash(filepath.Clean(pattern)),
-		filepath.Clean(filepath.ToSlash(pattern)),
-		toNixPath(pattern),
-	)
-	pattern = filepath.ToSlash(pattern)
+	pattern = toNixPath(pattern)
 	options := compileOptions(opts, pattern)
 
-	pattern = strings.TrimSuffix(strings.TrimPrefix(pattern, options.prefix), separatorString)
+	pattern = strings.TrimPrefix(pattern, options.prefix)
 	matcher, err := glob.Compile(pattern, separatorRune)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)

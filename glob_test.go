@@ -25,7 +25,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"glob_test.go",
 			"prefix_test.go",
 		}, matches)
-		require.Equal(t, "&{fs:. matchDirectoriesDirectly:false prefix:./}", w.String())
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:false prefix:./ pattern:*_test.go}", w.String())
 	})
 
 	t.Run("real with rootfs", func(t *testing.T) {
@@ -35,20 +35,49 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		require.NoError(t, err)
 
 		prefix := "/"
-		if runtime.GOOS == "windows" {
+		if isWindows() {
 			prefix = filepath.VolumeName(wd) + "/"
 		}
 
 		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
 
 		var w bytes.Buffer
-		matches, err := Glob(pattern, MaybeRootFS(pattern), WriteOptions(&w))
+		matches, err := Glob(pattern, MaybeRootFS, WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			toNixPath(filepath.Join(wd, "glob_test.go")),
 			toNixPath(filepath.Join(wd, "prefix_test.go")),
 		}, matches)
-		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s}", prefix, prefix), w.String())
+		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, pattern), w.String())
+	})
+
+	t.Run("real with rootfs on relative path to parent", func(t *testing.T) {
+		t.Parallel()
+
+		wd, err := os.Getwd()
+		require.NoError(t, err)
+
+		dir := filepath.Base(wd)
+
+		prefix := "/"
+		if isWindows() {
+			prefix = filepath.VolumeName(wd) + "/"
+		}
+
+		pattern := "../" + dir + "/*_test.go"
+		abs, err := filepath.Abs(pattern)
+		require.NoError(t, err)
+
+		abs = toNixPath(abs)
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, MaybeRootFS, WriteOptions(&w))
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
+		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, abs), w.String())
 	})
 
 	t.Run("real with rootfs on relative path", func(t *testing.T) {
@@ -57,13 +86,13 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		pattern := "./*_test.go"
 
 		var w bytes.Buffer
-		matches, err := Glob(pattern, MaybeRootFS(pattern), WriteOptions(&w))
+		matches, err := Glob(pattern, MaybeRootFS, WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			"glob_test.go",
 			"prefix_test.go",
 		}, matches)
-		require.Equal(t, "&{fs:. matchDirectoriesDirectly:false prefix:./}", w.String())
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:false prefix:./ pattern:./*_test.go}", w.String())
 	})
 
 	t.Run("real with rootfs on relative path match dir", func(t *testing.T) {
@@ -72,12 +101,12 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		pattern := ".github"
 
 		var w bytes.Buffer
-		matches, err := Glob(pattern, MaybeRootFS(pattern), MatchDirectoryAsFile, WriteOptions(&w))
+		matches, err := Glob(pattern, MaybeRootFS, MatchDirectoryAsFile, WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			".github",
 		}, matches)
-		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./}", w.String())
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./ pattern:.github}", w.String())
 	})
 
 	t.Run("real with rootfs on relative path match dir", func(t *testing.T) {
@@ -86,12 +115,12 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		pattern := ".github/workflows/"
 
 		var w bytes.Buffer
-		matches, err := Glob(pattern, MaybeRootFS(pattern), MatchDirectoryAsFile, WriteOptions(&w))
+		matches, err := Glob(pattern, MaybeRootFS, MatchDirectoryAsFile, WriteOptions(&w))
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			".github/workflows",
 		}, matches)
-		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./}", w.String())
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./ pattern:.github/workflows/}", w.String())
 	})
 
 	t.Run("simple", func(t *testing.T) {
@@ -113,7 +142,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"a/d/file1.txt",
 			"a/nope/file1.txt",
 		}, matches)
-		require.Equal(t, fmt.Sprintf("&{fs:%+v matchDirectoriesDirectly:false prefix:./}", fsys), w.String())
+		require.Equal(t, fmt.Sprintf("&{fs:%+v matchDirectoriesDirectly:false prefix:./ pattern:./a/*/*}", fsys), w.String())
 	})
 
 	t.Run("single file", func(t *testing.T) {
@@ -270,7 +299,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("escaped asterisk", func(t *testing.T) {
 		t.Parallel()
-		if runtime.GOOS == "windows" {
+		if isWindows() {
 			t.Skip("can't create paths with * on Windows")
 		}
 		matches, err := Glob("a/\\*/b", WithFs(testFs(t, []string{
@@ -407,4 +436,8 @@ func testFs(tb testing.TB, files, dirs []string) fs.FS {
 	}
 
 	return tmpfs
+}
+
+func isWindows() bool {
+	return runtime.GOOS == "windows"
 }

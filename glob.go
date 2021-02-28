@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -27,6 +26,8 @@ type globOptions struct {
 	matchDirectoriesDirectly bool
 
 	prefix string
+
+	pattern string
 }
 
 // OptFunc is a function that allow to customize Glob.
@@ -43,22 +44,20 @@ func WithFs(f fs.FS) OptFunc {
 // volume (on windows) if the given pattern is an absolute path.
 //
 // Result will also be prepended with the root path or volume.
-func MaybeRootFS(pattern string) OptFunc {
-	if !filepath.IsAbs(pattern) {
-		return func(opts *globOptions) {}
+func MaybeRootFS(opts *globOptions) {
+	if !filepath.IsAbs(opts.pattern) {
+		return
 	}
-	return func(opts *globOptions) {
-		prefix := ""
-		if strings.HasPrefix(pattern, separatorString) {
-			prefix = separatorString
-		}
-		if vol := filepath.VolumeName(pattern); vol != "" {
-			prefix = vol + "/"
-		}
-		if prefix != "" {
-			opts.prefix = prefix
-			opts.fs = os.DirFS(prefix)
-		}
+	prefix := ""
+	if strings.HasPrefix(opts.pattern, separatorString) {
+		prefix = separatorString
+	}
+	if vol := filepath.VolumeName(opts.pattern); vol != "" {
+		prefix = vol + "/"
+	}
+	if prefix != "" {
+		opts.prefix = prefix
+		opts.fs = os.DirFS(prefix)
 	}
 }
 
@@ -95,14 +94,24 @@ func QuoteMeta(pattern string) string {
 // toNixPath converts the path to the nix style path
 // Windows style path separators are escape characters so cause issues with the compiled glob.
 func toNixPath(s string) string {
-	return path.Clean(filepath.ToSlash(s))
+	return filepath.ToSlash(filepath.Clean(s))
 }
 
 // Glob returns all files that match the given pattern in the current directory.
 // If the given pattern indicates an absolute path, it will glob from `/`.
+// If the given pattern starts with `../`, it will resolve to its absolute path and glob from `/`.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,cyclop
 	var matches []string
-	options := compileOptions(opts)
+
+	if strings.HasPrefix(pattern, "../") {
+		p, err := filepath.Abs(pattern)
+		if err != nil {
+			return matches, fmt.Errorf("failed to resolve pattern: %s: %w", pattern, err)
+		}
+		pattern = filepath.ToSlash(p)
+	}
+
+	options := compileOptions(opts, pattern)
 
 	pattern = strings.TrimSuffix(strings.TrimPrefix(pattern, options.prefix), separatorString)
 	matcher, err := glob.Compile(pattern, separatorRune)
@@ -178,10 +187,11 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 	return cleanFilepaths(matches, options.prefix), nil
 }
 
-func compileOptions(optFuncs []OptFunc) *globOptions {
+func compileOptions(optFuncs []OptFunc, pattern string) *globOptions {
 	opts := &globOptions{
-		fs:     os.DirFS("."),
-		prefix: "./",
+		fs:      os.DirFS("."),
+		prefix:  "./",
+		pattern: pattern,
 	}
 
 	for _, apply := range optFuncs {

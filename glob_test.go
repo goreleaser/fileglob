@@ -68,6 +68,8 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		abs, err := filepath.Abs(pattern)
 		require.NoError(t, err)
 
+		abs = toNixPath(abs)
+
 		var w bytes.Buffer
 		matches, err := Glob(pattern, MaybeRootFS, WriteOptions(&w))
 		require.NoError(t, err)

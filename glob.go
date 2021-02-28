@@ -108,10 +108,9 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 		if err != nil {
 			return matches, fmt.Errorf("failed to resolve pattern: %s: %w", pattern, err)
 		}
-		pattern = p
+		pattern = filepath.ToSlash(p)
 	}
 
-	pattern = filepath.ToSlash(pattern)
 	options := compileOptions(opts, pattern)
 
 	pattern = strings.TrimSuffix(strings.TrimPrefix(pattern, options.prefix), separatorString)

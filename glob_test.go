@@ -68,16 +68,14 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		abs, err := filepath.Abs(pattern)
 		require.NoError(t, err)
 
-		abs = toNixPath(abs)
-
 		var w bytes.Buffer
 		matches, err := Glob(pattern, MaybeRootFS, WriteOptions(&w))
+		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, abs), w.String())
 		require.NoError(t, err)
 		require.Equal(t, []string{
 			toNixPath(filepath.Join(wd, "glob_test.go")),
 			toNixPath(filepath.Join(wd, "prefix_test.go")),
 		}, matches)
-		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, abs), w.String())
 	})
 
 	t.Run("real with rootfs on relative path", func(t *testing.T) {

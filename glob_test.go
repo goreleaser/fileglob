@@ -87,7 +87,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		abs = toNixPath(abs)
 
 		var w bytes.Buffer
-		matches, err := Glob(pattern, MaybeRootFS, WriteOptions(&w))
+		matches, err := Glob(toNixPath(pattern), MaybeRootFS, WriteOptions(&w))
 		require.Error(t, err)
 		require.True(t, strings.HasSuffix(err.Error(), "file does not exist"), "should have been file does not exist, got: "+err.Error())
 		require.Empty(t, matches)

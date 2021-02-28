@@ -88,7 +88,7 @@ func MatchDirectoryAsFile(opts *globOptions) {
 // QuoteMeta returns a string that quotes all glob pattern meta characters
 // inside the argument text; For example, QuoteMeta(`{foo*}`) returns `\{foo\*\}`.
 func QuoteMeta(pattern string) string {
-	return glob.QuoteMeta(filepath.ToSlash(pattern))
+	return glob.QuoteMeta(pattern)
 }
 
 // toNixPath converts the path to the nix style path

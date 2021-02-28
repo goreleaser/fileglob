@@ -35,7 +35,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		require.NoError(t, err)
 
 		prefix := "/"
-		if runtime.GOOS == "windows" {
+		if isWindows() {
 			prefix = filepath.VolumeName(wd) + "/"
 		}
 
@@ -60,7 +60,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		dir := filepath.Base(wd)
 
 		prefix := "/"
-		if runtime.GOOS == "windows" {
+		if isWindows() {
 			prefix = filepath.VolumeName(wd) + "/"
 		}
 
@@ -297,7 +297,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("escaped asterisk", func(t *testing.T) {
 		t.Parallel()
-		if runtime.GOOS == "windows" {
+		if isWindows() {
 			t.Skip("can't create paths with * on Windows")
 		}
 		matches, err := Glob("a/\\*/b", WithFs(testFs(t, []string{
@@ -434,4 +434,8 @@ func testFs(tb testing.TB, files, dirs []string) fs.FS {
 	}
 
 	return tmpfs
+}
+
+func isWindows() bool {
+	return runtime.GOOS == "windows"
 }

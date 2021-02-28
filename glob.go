@@ -42,8 +42,7 @@ func WithFs(f fs.FS) OptFunc {
 }
 
 // MaybeRootFS setups fileglob to walk from the root directory (/) or
-// volume (on windows) if the given pattern is an absolute path or a path
-// starting with ../ (which will then be resolved first).
+// volume (on windows) if the given pattern is an absolute path.
 //
 // Result will also be prepended with the root path or volume.
 func MaybeRootFS(opts *globOptions) {
@@ -101,6 +100,7 @@ func toNixPath(s string) string {
 
 // Glob returns all files that match the given pattern in the current directory.
 // If the given pattern indicates an absolute path, it will glob from `/`.
+// If the given pattern starts with `../`, it will resolve to its absolute path and glob from `/`.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,cyclop
 	var matches []string
 

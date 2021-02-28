@@ -113,8 +113,15 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 		pattern = p
 	}
 
-	log.Println("HERE", pattern)
-
+	log.Printf(
+		"filepath=%, toslash=%s, clean=%s, toslash(clean)=%s, clean(toslash)=%s",
+		pattern,
+		filepath.ToSlash(pattern),
+		filepath.Clean(pattern),
+		filepath.ToSlash(filepath.Clean(pattern)),
+		filepath.Clean(filepath.ToSlash(pattern)),
+	)
+	pattern = filepath.ToSlash(pattern)
 	options := compileOptions(opts, pattern)
 
 	pattern = strings.TrimSuffix(strings.TrimPrefix(pattern, options.prefix), separatorString)

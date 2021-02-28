@@ -130,20 +130,20 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 			// glob contains no dynamic matchers so prefix is the file name that
 			// the glob references directly. When the glob explicitly references
 			// a single non-existing file, return an error for the user to check.
-			return []string{}, fmt.Errorf(`matching "%s": %w`, prefix, fs.ErrNotExist)
+			return []string{}, fmt.Errorf(`matching "%s%s": %w`, options.prefix, prefix, fs.ErrNotExist)
 		}
 
 		return []string{}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("stat static prefix %q: %w", prefix, err)
+		return nil, fmt.Errorf("stat static prefix %s%s: %w", options.prefix, prefix, err)
 	}
 
 	if !prefixInfo.IsDir() {
 		// if the prefix is a file, it either has to be
 		// the only match, or nothing matches at all
 		if matcher.Match(prefix) {
-			return []string{prefix}, nil
+			return cleanFilepaths([]string{prefix}, options.prefix), nil
 		}
 
 		return []string{}, nil

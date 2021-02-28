@@ -51,6 +51,21 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, pattern), w.String())
 	})
 
+	t.Run("real with rootfs direct file", func(t *testing.T) {
+		t.Parallel()
+
+		wd, err := os.Getwd()
+		require.NoError(t, err)
+
+		pattern := toNixPath(filepath.Join(wd, "prefix.go"))
+
+		matches, err := Glob(pattern, MaybeRootFS)
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			toNixPath(filepath.Join(wd, "prefix.go")),
+		}, matches)
+	})
+
 	t.Run("real with rootfs on relative path to parent", func(t *testing.T) {
 		t.Parallel()
 
@@ -258,7 +273,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"./a/nope.txt",
 			"./a/b/dc",
 		}, nil)))
-		require.EqualError(t, err, "matching \"a/b/d\": file does not exist")
+		require.EqualError(t, err, "matching \"./a/b/d\": file does not exist")
 		require.True(t, errors.Is(err, os.ErrNotExist))
 		require.Empty(t, matches)
 	})
@@ -266,7 +281,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("escaped direct no match", func(t *testing.T) {
 		t.Parallel()
 		matches, err := Glob("a/\\{b\\}", WithFs(testFs(t, nil, nil)))
-		require.EqualError(t, err, "matching \"a/{b}\": file does not exist")
+		require.EqualError(t, err, "matching \"./a/{b}\": file does not exist")
 		require.True(t, errors.Is(err, os.ErrNotExist))
 		require.Empty(t, matches)
 	})
@@ -277,7 +292,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"./a/nope.txt",
 			"./a/b/dc",
 		}, nil)))
-		require.EqualError(t, err, "matching \"a/b/c{a\": file does not exist")
+		require.EqualError(t, err, "matching \"./a/b/c{a\": file does not exist")
 		require.Empty(t, matches)
 	})
 

@@ -89,7 +89,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		var w bytes.Buffer
 		matches, err := Glob(pattern, MaybeRootFS, WriteOptions(&w))
 		require.Error(t, err)
-		require.True(t, strings.HasSuffix(err.Error(), "file does not exist"))
+		require.True(t, strings.HasSuffix(err.Error(), "file does not exist"), err.Error())
 		require.Empty(t, matches)
 		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, abs), w.String())
 	})

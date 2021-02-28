@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -111,6 +112,8 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 		}
 		pattern = p
 	}
+
+	log.Println("HERE", pattern)
 
 	options := compileOptions(opts, pattern)
 

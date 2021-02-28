@@ -114,7 +114,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 	}
 
 	log.Printf(
-		"filepath=%, toslash=%s, clean=%s, toslash(clean)=%s, clean(toslash)=%s",
+		"filepath=%s, toslash=%s, clean=%s, toslash(clean)=%s, clean(toslash)=%s",
 		pattern,
 		filepath.ToSlash(pattern),
 		filepath.Clean(pattern),

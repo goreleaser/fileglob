@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -110,7 +109,6 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 			return matches, fmt.Errorf("failed to resolve pattern: %s: %w", pattern, err)
 		}
 		pattern = filepath.ToSlash(p)
-		log.Println("new pattern", pattern)
 	}
 
 	options := compileOptions(opts, pattern)

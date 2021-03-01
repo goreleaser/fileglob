@@ -136,7 +136,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"glob_test.go",
 			"prefix_test.go",
 		}, matches)
-		require.Equal(t, "&{fs:. matchDirectoriesDirectly:false prefix:./ pattern:./*_test.go}", w.String())
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:false prefix:./ pattern:*_test.go}", w.String())
 	})
 
 	t.Run("real with rootfs on relative path match dir", func(t *testing.T) {
@@ -164,7 +164,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		require.Equal(t, []string{
 			".github/workflows",
 		}, matches)
-		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./ pattern:.github/workflows/}", w.String())
+		require.Equal(t, "&{fs:. matchDirectoriesDirectly:true prefix:./ pattern:.github/workflows}", w.String())
 	})
 
 	t.Run("simple", func(t *testing.T) {
@@ -186,7 +186,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"a/d/file1.txt",
 			"a/nope/file1.txt",
 		}, matches)
-		require.Equal(t, fmt.Sprintf("&{fs:%+v matchDirectoriesDirectly:false prefix:./ pattern:./a/*/*}", fsys), w.String())
+		require.Equal(t, fmt.Sprintf("&{fs:%+v matchDirectoriesDirectly:false prefix:./ pattern:a/*/*}", fsys), w.String())
 	})
 
 	t.Run("single file", func(t *testing.T) {

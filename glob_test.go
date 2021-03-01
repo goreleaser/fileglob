@@ -8,9 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/caarlos0/testfs"
+	"github.com/gobwas/glob"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,6 +66,33 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		require.Equal(t, []string{
 			toNixPath(filepath.Join(wd, "prefix.go")),
 		}, matches)
+	})
+
+	t.Run("real with rootfs on relative path to parent disable globbing", func(t *testing.T) {
+		t.Parallel()
+
+		wd, err := os.Getwd()
+		require.NoError(t, err)
+
+		dir := filepath.Base(wd)
+
+		prefix := "/"
+		if isWindows() {
+			prefix = filepath.VolumeName(wd) + "/"
+		}
+
+		pattern := "../" + dir + "/{file}["
+
+		abs, err := filepath.Abs(pattern)
+		require.NoError(t, err)
+		abs = toNixPath(abs)
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, MaybeRootFS, QuoteMeta, WriteOptions(&w))
+		require.Error(t, err)
+		require.True(t, strings.HasSuffix(err.Error(), "file does not exist"), "should have been file does not exist, got: "+err.Error())
+		require.Empty(t, matches)
+		require.Equal(t, fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, glob.QuoteMeta(abs)), w.String())
 	})
 
 	t.Run("real with rootfs on relative path to parent", func(t *testing.T) {
@@ -259,7 +288,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("direct match wildcard", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob(QuoteMeta("a/b/c{a"), WithFs(testFs(t, []string{
+		matches, err := Glob("a/b/c{a", QuoteMeta, WithFs(testFs(t, []string{
 			"./a/nope.txt",
 			"a/b/c{a",
 		}, nil)))
@@ -288,7 +317,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("direct no match escaped wildcards", func(t *testing.T) {
 		t.Parallel()
-		matches, err := Glob(QuoteMeta("a/b/c{a"), WithFs(testFs(t, []string{
+		matches, err := Glob("a/b/c{a", QuoteMeta, WithFs(testFs(t, []string{
 			"./a/nope.txt",
 			"./a/b/dc",
 		}, nil)))
@@ -425,7 +454,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 func TestQuoteMeta(t *testing.T) {
 	t.Parallel()
-	matches, err := Glob(QuoteMeta("{a,b}/c"), WithFs(testFs(t, []string{
+	matches, err := Glob("{a,b}/c", QuoteMeta, WithFs(testFs(t, []string{
 		"a/c",
 		"b/c",
 		"{a,b}/c",

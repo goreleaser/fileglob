@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -85,10 +86,10 @@ func MatchDirectoryAsFile(opts *globOptions) {
 	opts.matchDirectoriesDirectly = true
 }
 
-// QuoteMeta returns a string that quotes all glob pattern meta characters
-// inside the argument text; For example, QuoteMeta(`{foo*}`) returns `\{foo\*\}`.
-func QuoteMeta(pattern string) string {
-	return glob.QuoteMeta(pattern)
+// QuoteMeta quotes all glob pattern meta characters inside the argument text.
+// For example, QuoteMeta for a pattern `{foo*}` sets the pattern to `\{foo\*\}`.
+func QuoteMeta(opts *globOptions) {
+	opts.pattern = glob.QuoteMeta(opts.pattern)
 }
 
 // toNixPath converts the path to the nix style path
@@ -109,11 +110,12 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 			return matches, fmt.Errorf("failed to resolve pattern: %s: %w", pattern, err)
 		}
 		pattern = filepath.ToSlash(p)
+		log.Println("new pattern", pattern)
 	}
 
 	options := compileOptions(opts, pattern)
 
-	pattern = strings.TrimSuffix(strings.TrimPrefix(pattern, options.prefix), separatorString)
+	pattern = strings.TrimSuffix(strings.TrimPrefix(options.pattern, options.prefix), separatorString)
 	matcher, err := glob.Compile(pattern, separatorRune)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)

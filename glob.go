@@ -104,18 +104,23 @@ func toNixPath(s string) string {
 func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,cyclop
 	var matches []string
 
+	// ensure we are using unix-style paths
+	pattern = toNixPath(pattern)
+
+	// resolve patterns starting with ../
 	if strings.HasPrefix(pattern, "../") {
 		p, err := filepath.Abs(pattern)
 		if err != nil {
 			return matches, fmt.Errorf("failed to resolve pattern: %s: %w", pattern, err)
 		}
-		pattern = filepath.ToSlash(p)
-		log.Println("new pattern", pattern)
+		pattern = toNixPath(p)
 	}
 
 	options := compileOptions(opts, pattern)
 
-	pattern = strings.TrimSuffix(strings.TrimPrefix(options.pattern, options.prefix), separatorString)
+	// trim the fs.FS prefix
+	pattern = strings.TrimPrefix(options.pattern, options.prefix)
+
 	matcher, err := glob.Compile(pattern, separatorRune)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)

@@ -453,11 +453,11 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 	t.Run("symlinks", func(t *testing.T) {
 		t.Parallel()
-		testFS := testFs(t, []string{
-			"./a/file",
-		}, nil).(testfs.FS)
+		var fsPath string
+		if testFS, ok := testFs(t, []string{"./a/file"}, nil).(testfs.FS); ok {
+			fsPath = testFS.Path()
+		}
 
-		fsPath := testFS.Path()
 		workingSymlink := filepath.Join(fsPath, "b")
 		brokenSymlink := filepath.Join(fsPath, "c")
 		err := os.Symlink("a", workingSymlink)

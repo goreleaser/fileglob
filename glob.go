@@ -124,6 +124,14 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 		return nil, fmt.Errorf("cannot determine static prefix: %w", err)
 	}
 
+	// Check if the file is valid symlink without following it
+	// It works only for valid absolut or relative file paths, in other words, will fail for WithFs() option
+	if patternInfo, err := os.Lstat(pattern); err == nil {
+		if patternInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
+			return cleanFilepaths([]string{pattern}, options.prefix), nil
+		}
+	}
+
 	prefixInfo, err := fs.Stat(options.fs, prefix)
 	if errors.Is(err, fs.ErrNotExist) {
 		if !ContainsMatchers(pattern) {

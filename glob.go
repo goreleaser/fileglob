@@ -126,7 +126,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 
 	// Check if the file is valid symlink without following it
 	// It works only for valid absolut or relative file paths, in other words, will fail for WithFs() option
-	if patternInfo, err := os.Lstat(pattern); err == nil {
+	if patternInfo, err := os.Lstat(pattern); err == nil { // nolint:govet
 		if patternInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
 			return cleanFilepaths([]string{pattern}, options.prefix), nil
 		}

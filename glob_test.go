@@ -450,6 +450,32 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			"a/b/4.txt",
 		}, matches)
 	})
+
+	t.Run("symlinks", func(t *testing.T) {
+		t.Parallel()
+		var fsPath string
+		if testFS, ok := testFs(t, []string{"./a/file"}, nil).(testfs.FS); ok {
+			fsPath = testFS.Path()
+		}
+
+		workingSymlink := filepath.Join(fsPath, "b")
+		brokenSymlink := filepath.Join(fsPath, "c")
+		err := os.Symlink("a", workingSymlink)
+		require.NoError(t, err)
+		err = os.Symlink("non-existent", brokenSymlink)
+		require.NoError(t, err)
+
+		matches, err := Glob(workingSymlink)
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			workingSymlink,
+		}, matches)
+		matches, err = Glob(brokenSymlink)
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			brokenSymlink,
+		}, matches)
+	})
 }
 
 func TestQuoteMeta(t *testing.T) {

@@ -458,23 +458,26 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			fsPath = testFS.Path()
 		}
 
-		workingSymlink := filepath.Join(fsPath, "b")
-		brokenSymlink := filepath.Join(fsPath, "c")
-		err := os.Symlink("a", workingSymlink)
-		require.NoError(t, err)
-		err = os.Symlink("non-existent", brokenSymlink)
-		require.NoError(t, err)
+		t.Run("good", func(t *testing.T) {
+			workingSymlink := filepath.Join(fsPath, "b")
+			require.NoError(t, os.Symlink("a", workingSymlink))
+			matches, err := Glob(workingSymlink)
+			require.NoError(t, err)
+			require.Equal(t, []string{
+				workingSymlink,
+			}, matches)
+		})
 
-		matches, err := Glob(workingSymlink)
-		require.NoError(t, err)
-		require.Equal(t, []string{
-			workingSymlink,
-		}, matches)
-		matches, err = Glob(brokenSymlink)
-		require.NoError(t, err)
-		require.Equal(t, []string{
-			brokenSymlink,
-		}, matches)
+		t.Run("broken", func(t *testing.T) {
+			brokenSymlink := filepath.Join(fsPath, "c")
+			require.NoError(t, os.Symlink("non-existent", brokenSymlink))
+
+			matches, err := Glob(brokenSymlink)
+			require.NoError(t, err)
+			require.Equal(t, []string{
+				brokenSymlink,
+			}, matches)
+		})
 	})
 }
 

@@ -54,7 +54,10 @@ func TestGlob(t *testing.T) { // nolint:funlen
 			toNixPath(filepath.Join(wd, "glob_test.go")),
 			toNixPath(filepath.Join(wd, "prefix_test.go")),
 		}, matches)
-		is.Equal(fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, pattern), w.String())
+		is.Equal(fmt.Sprintf(
+			"&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}",
+			prefix, prefix, pattern,
+		), w.String())
 	})
 
 	t.Run("real with rootfs direct file", func(t *testing.T) {
@@ -98,7 +101,10 @@ func TestGlob(t *testing.T) { // nolint:funlen
 		is.True(err != nil)                                            // expected an error
 		is.True(strings.HasSuffix(err.Error(), "file does not exist")) // should have been file does not exist
 		is.Equal([]string{}, matches)
-		is.Equal(fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, glob.QuoteMeta(abs)), w.String())
+		is.Equal(fmt.Sprintf(
+			"&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}",
+			prefix, prefix, glob.QuoteMeta(abs),
+		), w.String())
 	})
 
 	t.Run("real with rootfs on relative path to parent", func(t *testing.T) {

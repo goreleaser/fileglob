@@ -1,13 +1,11 @@
 package fileglob
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/gobwas/glob/syntax/ast"
 	"github.com/gobwas/glob/syntax/lexer"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/matryer/is"
 )
 
 func TestStaticPrefix(t *testing.T) {
@@ -27,9 +25,12 @@ func TestStaticPrefix(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		prefix, err := staticPrefix(testCase.pattern)
-		require.NoError(t, err)
-		assert.Equal(t, testCase.prefix, prefix)
+		t.Run(testCase.pattern, func(t *testing.T) {
+			is := is.New(t)
+			prefix, err := staticPrefix(testCase.pattern)
+			is.NoErr(err)
+			is.Equal(testCase.prefix, prefix)
+		})
 	}
 }
 
@@ -51,11 +52,12 @@ func TestContainsMatchers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		_, err := ast.Parse(lexer.NewLexer(testCase.pattern))
-		require.NoError(t, err)
-
-		assert.Equal(t, testCase.containsMatchers, ContainsMatchers(testCase.pattern),
-			fmt.Sprintf("pattern: %s", testCase.pattern))
+		t.Run(testCase.pattern, func(t *testing.T) {
+			is := is.New(t)
+			_, err := ast.Parse(lexer.NewLexer(testCase.pattern))
+			is.NoErr(err)
+			is.Equal(testCase.containsMatchers, ContainsMatchers(testCase.pattern))
+		})
 	}
 }
 
@@ -71,7 +73,8 @@ func TestValidPattern(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		assert.Equal(t, testCase.valid, ValidPattern(testCase.pattern) == nil,
-			fmt.Sprintf("pattern: %s", testCase.pattern))
+		t.Run(testCase.pattern, func(t *testing.T) {
+			is.New(t).Equal(testCase.valid, ValidPattern(testCase.pattern) == nil)
+		})
 	}
 }

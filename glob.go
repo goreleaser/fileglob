@@ -212,7 +212,7 @@ func compileOptions(optFuncs []OptFunc, pattern string) *globOptions {
 func filesInDirectory(options *globOptions, dir string) ([]string, error) {
 	var files []string
 
-	return files, fs.WalkDir(options.fs, dir, func(path string, info fs.DirEntry, err error) error {
+	err := fs.WalkDir(options.fs, dir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -223,6 +223,10 @@ func filesInDirectory(options *globOptions, dir string) ([]string, error) {
 		files = append(files, path)
 		return nil
 	})
+	if err != nil {
+		return files, fmt.Errorf("failed to get files in directory: %w", err)
+	}
+	return files, nil
 }
 
 func cleanFilepaths(paths []string, prefix string) []string {

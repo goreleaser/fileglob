@@ -10,6 +10,7 @@ linters:
     - nlreturn
     - gci
     - exhaustivestruct
+    - varnamelen
 linters-settings:
   maligned:
     # print struct with more effective memory layout or not, false by default

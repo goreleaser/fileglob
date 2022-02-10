@@ -1,3 +1,4 @@
+// nolint: gocritic
 package fileglob
 
 import (
@@ -21,6 +22,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 	t.Run("real", func(t *testing.T) {
 		t.Parallel()
 		is := is.New(t)
+
 		var w bytes.Buffer
 		matches, err := Glob("*_test.go", WriteOptions(&w))
 		is.NoErr(err)
@@ -93,7 +95,7 @@ func TestGlob(t *testing.T) { // nolint:funlen
 
 		var w bytes.Buffer
 		matches, err := Glob(pattern, MaybeRootFS, QuoteMeta, WriteOptions(&w))
-		is.True(err != nil)                                            //exepected an error
+		is.True(err != nil)                                            // expected an error
 		is.True(strings.HasSuffix(err.Error(), "file does not exist")) // should have been file does not exist
 		is.Equal([]string{}, matches)
 		is.Equal(fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, glob.QuoteMeta(abs)), w.String())

@@ -47,7 +47,11 @@ func staticText(node *ast.Node) (text string, ok bool) {
 
 		return text, true
 	case ast.KindText:
-		return node.Value.(ast.Text).Text, true
+		t, ok := node.Value.(ast.Text)
+		if !ok {
+			return "", false
+		}
+		return t.Text, true
 	case ast.KindNothing:
 		return "", true
 	default:

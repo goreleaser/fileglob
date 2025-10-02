@@ -100,7 +100,7 @@ func toNixPath(s string) string {
 // Glob returns all files that match the given pattern in the current directory.
 // If the given pattern indicates an absolute path, it will glob from `/`.
 // If the given pattern starts with `../`, it will resolve to its absolute path and glob from `/`.
-func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,cyclop
+func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,cyclop
 	var matches []string
 
 	if strings.HasPrefix(pattern, "../") {
@@ -126,7 +126,7 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { // nolint:funlen,
 
 	// Check if the file is valid symlink without following it
 	// It works only for valid absolut or relative file paths, in other words, will fail for WithFs() option
-	if patternInfo, err := os.Lstat(pattern); err == nil { // nolint:govet
+	if patternInfo, err := os.Lstat(pattern); err == nil {
 		if patternInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
 			return cleanFilepaths([]string{pattern}, options.prefix), nil
 		}

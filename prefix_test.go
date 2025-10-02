@@ -1,4 +1,3 @@
-// nolint: gocritic
 package fileglob
 
 import (
@@ -26,7 +25,6 @@ func TestStaticPrefix(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.pattern, func(t *testing.T) {
 			t.Parallel()
 			is := is.New(t)
@@ -55,7 +53,6 @@ func TestContainsMatchers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.pattern, func(t *testing.T) {
 			t.Parallel()
 			is := is.New(t)
@@ -78,7 +75,6 @@ func TestValidPattern(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.pattern, func(t *testing.T) {
 			t.Parallel()
 			is.New(t).Equal(testCase.valid, ValidPattern(testCase.pattern) == nil)

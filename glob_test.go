@@ -1,4 +1,3 @@
-// nolint: gocritic
 package fileglob
 
 import (
@@ -17,7 +16,7 @@ import (
 	"github.com/matryer/is"
 )
 
-func TestGlob(t *testing.T) { // nolint:funlen,maintidx
+func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 	t.Parallel()
 	t.Run("real", func(t *testing.T) {
 		t.Parallel()

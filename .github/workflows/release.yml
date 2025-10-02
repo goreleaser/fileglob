@@ -1,0 +1,31 @@
+#
+# Releaser workflow setup
+# https://goreleaser.com/ci/actions/
+#
+name: release
+
+# run only on tags
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # needed to write releases
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
+          persist-credentials: false
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
+        with:
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

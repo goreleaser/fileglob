@@ -18,8 +18,7 @@ const (
 )
 
 type globOptions struct {
-	fs        fs.FS
-	defaultFS bool
+	fs fs.FS
 
 	// if matchDirectories directly is set to true a matching directory will
 	// be treated just like a matching file. If set to false, a matching directory
@@ -35,10 +34,13 @@ type globOptions struct {
 type OptFunc func(opts *globOptions)
 
 // WithFs allows to provide another fs.FS implementation to Glob.
+//
+// Patterns are always relative to the root of the given fs.FS, so this also
+// disables the default root filesystem handling of absolute patterns.
 func WithFs(f fs.FS) OptFunc {
 	return func(opts *globOptions) {
 		opts.fs = f
-		opts.defaultFS = false
+		opts.prefix = "./"
 	}
 }
 
@@ -46,6 +48,9 @@ func WithFs(f fs.FS) OptFunc {
 // volume (on windows) if the given pattern is an absolute path.
 //
 // Result will also be prepended with the root path or volume.
+//
+// This is the default behavior, so this option is not needed anymore.
+// It is kept for backwards compatibility.
 func MaybeRootFS(opts *globOptions) {
 	if !filepath.IsAbs(opts.pattern) {
 		return
@@ -60,15 +65,13 @@ func MaybeRootFS(opts *globOptions) {
 	if prefix != "" {
 		opts.prefix = prefix
 		opts.fs = os.DirFS(prefix)
-		opts.defaultFS = false
 	}
 }
 
 // WriteOptions write the current options to the given writer.
 func WriteOptions(w io.Writer) OptFunc {
 	return func(opts *globOptions) {
-		_, _ = fmt.Fprintf(w, "&{fs:%+v matchDirectoriesDirectly:%t prefix:%s pattern:%s}",
-			opts.fs, opts.matchDirectoriesDirectly, opts.prefix, opts.pattern)
+		_, _ = fmt.Fprintf(w, "%+v", opts)
 	}
 }
 
@@ -102,7 +105,8 @@ func toNixPath(s string) string {
 }
 
 // Glob returns all files that match the given pattern in the current directory.
-// If the given pattern indicates an absolute path, it will glob from `/`.
+// If the given pattern indicates an absolute path, it will glob from `/` (or
+// from the volume root, on Windows).
 // If the given pattern starts with `../`, it will resolve to its absolute path and glob from `/`.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,cyclop
 	var matches []string
@@ -117,7 +121,15 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 
 	options := compileOptions(opts, pattern)
 
-	pattern = strings.TrimSuffix(strings.TrimPrefix(options.pattern, options.prefix), separatorString)
+	pattern = options.pattern
+	patternPrefix := options.prefix
+	nativePath := filepath.Separator == '\\' && options.prefix != "./" &&
+		strings.HasPrefix(pattern, filepath.FromSlash(options.prefix))
+	if nativePath {
+		pattern = filepath.ToSlash(pattern)
+		patternPrefix = filepath.ToSlash(patternPrefix)
+	}
+	pattern = strings.TrimSuffix(strings.TrimPrefix(pattern, patternPrefix), separatorString)
 	matcher, err := glob.Compile(pattern, separatorRune)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
@@ -129,20 +141,6 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 	}
 
 	hasMatchers := ContainsMatchers(pattern)
-
-	// Preserve absolute symlink matches without enabling root globbing by default.
-	if options.defaultFS && filepath.IsAbs(pattern) {
-		name, literal := prefix, !hasMatchers
-		if filepath.Separator == '\\' && !strings.Contains(pattern, separatorString) {
-			name = pattern
-			literal = !ContainsMatchers(filepath.ToSlash(pattern))
-		}
-		if literal {
-			if info, err := os.Lstat(name); err == nil && info.Mode()&fs.ModeSymlink != 0 {
-				return []string{name}, nil
-			}
-		}
-	}
 
 	var prefixInfo fs.FileInfo
 	if hasMatchers {
@@ -168,6 +166,10 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 		// if the prefix is a file, it either has to be
 		// the only match, or nothing matches at all
 		if matcher.Match(prefix) {
+			// Keep the caller's native Windows spelling for literal symlinks.
+			if nativePath && prefixInfo.Mode()&fs.ModeSymlink != 0 {
+				return []string{options.pattern}, nil
+			}
 			return cleanFilepaths([]string{prefix}, options.prefix), nil
 		}
 
@@ -214,11 +216,12 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 
 func compileOptions(optFuncs []OptFunc, pattern string) *globOptions {
 	opts := &globOptions{
-		fs:        os.DirFS("."),
-		defaultFS: true,
-		prefix:    "./",
-		pattern:   pattern,
+		fs:      os.DirFS("."),
+		prefix:  "./",
+		pattern: pattern,
 	}
+
+	MaybeRootFS(opts)
 
 	for _, apply := range optFuncs {
 		apply(opts)

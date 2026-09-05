@@ -33,6 +33,50 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 		is.Equal("&{fs:. matchDirectoriesDirectly:false prefix:./ pattern:*_test.go}", w.String())
 	})
 
+	// https://github.com/goreleaser/fileglob/issues/54
+	t.Run("real with absolute path and no options", func(t *testing.T) {
+		t.Parallel()
+		is := is.New(t)
+
+		wd, err := os.Getwd()
+		is.NoErr(err)
+
+		prefix := "/"
+		if isWindows() {
+			prefix = filepath.ToSlash(filepath.VolumeName(wd)) + "/"
+		}
+
+		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, WriteOptions(&w))
+		is.NoErr(err)
+		is.Equal([]string{
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
+		is.Equal(fmt.Sprintf(
+			"&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}",
+			prefix, prefix, pattern,
+		), w.String())
+	})
+
+	// https://github.com/goreleaser/fileglob/issues/54
+	t.Run("real with relative path to parent and no options", func(t *testing.T) {
+		t.Parallel()
+		is := is.New(t)
+
+		wd, err := os.Getwd()
+		is.NoErr(err)
+
+		matches, err := Glob("../" + filepath.Base(wd) + "/*_test.go")
+		is.NoErr(err)
+		is.Equal([]string{
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
+	})
+
 	t.Run("real with rootfs", func(t *testing.T) {
 		t.Parallel()
 		is := is.New(t)
@@ -555,12 +599,18 @@ func TestGlobMaybeRootFS(t *testing.T) {
 				"{literal}/file.txt":  {},
 				"{literal}/other.log": {},
 			}
+			// WithFs resets the prefix; preserve the root selected by MaybeRootFS.
+			withRootedFS := func(opts *globOptions) {
+				opts.fs = fsys
+			}
 			for _, testCase := range []struct {
 				name    string
 				pattern string
 				opts    []OptFunc
 				files   []string
 			}{
+				{"default wildcard", "*.txt", nil, []string{"root.txt"}},
+				{"default direct file", "root.txt", nil, []string{"root.txt"}},
 				{"wildcard", "*.txt", []OptFunc{MaybeRootFS}, []string{"root.txt"}},
 				{"direct file", "root.txt", []OptFunc{MaybeRootFS}, []string{"root.txt"}},
 				{"nested wildcard", "nested/*.txt", []OptFunc{MaybeRootFS}, []string{"nested/file.txt"}},
@@ -574,7 +624,7 @@ func TestGlobMaybeRootFS(t *testing.T) {
 				t.Run(testCase.name, func(t *testing.T) {
 					t.Parallel()
 					is := is.New(t)
-					matches, err := Glob(root.prefix+testCase.pattern, append(testCase.opts, WithFs(fsys))...)
+					matches, err := Glob(root.prefix+testCase.pattern, append(testCase.opts, withRootedFS)...)
 					is.NoErr(err)
 					want := make([]string, len(testCase.files))
 					for i, file := range testCase.files {
@@ -587,7 +637,7 @@ func TestGlobMaybeRootFS(t *testing.T) {
 			t.Run("missing direct file", func(t *testing.T) {
 				t.Parallel()
 				is := is.New(t)
-				matches, err := Glob(root.prefix+"missing.txt", MaybeRootFS, WithFs(fsys))
+				matches, err := Glob(root.prefix+"missing.txt", MaybeRootFS, withRootedFS)
 				is.True(errors.Is(err, fs.ErrNotExist))
 				is.Equal(fmt.Sprintf("matching %q: file does not exist", root.prefix+"missing.txt"), err.Error())
 				is.Equal([]string{}, matches)

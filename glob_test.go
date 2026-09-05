@@ -27,21 +27,22 @@ func TestGlobRootPatterns(t *testing.T) {
 	contents := []string{"a.txt", "sub/b.txt"}
 	rootContents := []string{root + "a.txt", root + "sub/b.txt"}
 	testCases := []struct {
-		name     string
-		pattern  string
-		rootFS   bool
-		contents []string
-		direct   []string
+		name           string
+		pattern        string
+		explicitRootFS bool
+		contents       []string
+		direct         []string
 	}{
 		{"empty", "", false, nil, nil},
 		{"empty with rootfs", "", true, nil, nil},
 		{"dot", ".", false, contents, []string{"."}},
 		{"dot slash", "./", false, contents, []string{"."}},
 		{"relative dot slash", "././", false, contents, []string{"."}},
-		{"absolute root", root, true, rootContents, []string{root}},
-		{"absolute root dot", root + ".", true, rootContents, []string{root}},
-		{"absolute root dot slash", root + "./", true, rootContents, []string{root}},
-		{"absolute wildcard", root + "*", true, rootContents, []string{root, root + "a.txt", root + "sub"}},
+		{"absolute root", root, false, rootContents, []string{root}},
+		{"absolute root with rootfs", root, true, rootContents, []string{root}},
+		{"absolute root dot", root + ".", false, rootContents, []string{root}},
+		{"absolute root dot slash", root + "./", false, rootContents, []string{root}},
+		{"absolute wildcard", root + "*", false, rootContents, []string{root, root + "a.txt", root + "sub"}},
 		{"relative wildcard", "./*", false, contents, []string{".", "a.txt", "sub"}},
 		{"relative directory", "sub", false, []string{"sub/b.txt"}, []string{"sub"}},
 		{"relative directory slash", "sub/", false, []string{"sub/b.txt"}, []string{"sub"}},
@@ -69,10 +70,13 @@ func TestGlobRootPatterns(t *testing.T) {
 						"sub/b.txt": {},
 					}
 					var opts []OptFunc
-					if testCase.rootFS {
+					if testCase.explicitRootFS {
 						opts = append(opts, MaybeRootFS)
 					}
-					opts = append(opts, WithFs(fsys))
+					opts = append(opts, func(opts *globOptions) {
+						// Preserve the selected root prefix; WithFs would reset it.
+						opts.fs = fsys
+					})
 					opts = append(opts, mode.opts...)
 
 					matches, err := Glob(testCase.pattern, opts...)
@@ -98,6 +102,50 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 			"prefix_test.go",
 		}, matches)
 		is.Equal("&{fs:. matchDirectoriesDirectly:false prefix:./ pattern:*_test.go}", w.String())
+	})
+
+	// https://github.com/goreleaser/fileglob/issues/54
+	t.Run("real with absolute path and no options", func(t *testing.T) {
+		t.Parallel()
+		is := is.New(t)
+
+		wd, err := os.Getwd()
+		is.NoErr(err)
+
+		prefix := "/"
+		if isWindows() {
+			prefix = filepath.VolumeName(wd) + "/"
+		}
+
+		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, WriteOptions(&w))
+		is.NoErr(err)
+		is.Equal([]string{
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
+		is.Equal(fmt.Sprintf(
+			"&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}",
+			prefix, prefix, pattern,
+		), w.String())
+	})
+
+	// https://github.com/goreleaser/fileglob/issues/54
+	t.Run("real with relative path to parent and no options", func(t *testing.T) {
+		t.Parallel()
+		is := is.New(t)
+
+		wd, err := os.Getwd()
+		is.NoErr(err)
+
+		matches, err := Glob("../" + filepath.Base(wd) + "/*_test.go")
+		is.NoErr(err)
+		is.Equal([]string{
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
 	})
 
 	t.Run("real with rootfs", func(t *testing.T) {

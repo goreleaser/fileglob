@@ -87,6 +87,9 @@ func MatchDirectoryIncludesContents(opts *globOptions) {
 
 // MatchDirectoryAsFile makes a match on a directory match its name only.
 //
+// Root directories are returned as "." for relative patterns, or as the root
+// path for absolute patterns.
+//
 // Also check MatchDirectoryIncludesContents.
 func MatchDirectoryAsFile(opts *globOptions) {
 	opts.matchDirectoriesDirectly = true
@@ -122,6 +125,9 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 	options := compileOptions(opts, pattern)
 
 	pattern = strings.TrimSuffix(strings.TrimPrefix(options.pattern, options.prefix), separatorString)
+	if options.pattern == options.prefix {
+		pattern = "."
+	}
 	matcher, err := glob.Compile(pattern, separatorRune)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
@@ -246,6 +252,9 @@ func cleanFilepaths(paths []string, prefix string) []string {
 	}
 	result := make([]string, len(paths))
 	for i, p := range paths {
+		if p == "." {
+			p = ""
+		}
 		result[i] = prefix + p
 	}
 	return result

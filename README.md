@@ -8,7 +8,6 @@
 	<a href="/LICENSE.md"><img alt="Software License" src="https://img.shields.io/badge/license-MIT-brightgreen.svg?style=for-the-badge"></a>
 	<a href="https://github.com/goreleaser/fileglob/actions?workflow=build"><img alt="GitHub Actions" src="https://img.shields.io/github/actions/workflow/status/goreleaser/fileglob/build.yml?style=for-the-badge&branch=main"></a>
 	<a href="https://codecov.io/gh/goreleaser/fileglob"><img alt="Codecov branch" src="https://img.shields.io/codecov/c/github/goreleaser/fileglob/master.svg?style=for-the-badge"></a>
-	<a href="https://goreportcard.com/report/github.com/goreleaser/fileglob"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/goreleaser/fileglob?style=for-the-badge"></a>
 	<a href="https://pkg.go.dev/github.com/goreleaser/fileglob"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
 	<a href="https://github.com/goreleaser"><img alt="Powered By: GoReleaser" src="https://img.shields.io/badge/powered%20by-goreleaser-green.svg?style=for-the-badge"></a>
 </p>

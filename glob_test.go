@@ -524,18 +524,115 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 	})
 }
 
+func TestUnclosedAlternatives(t *testing.T) {
+	t.Parallel()
+	for _, pattern := range []string{
+		"{",
+		"{foo",
+		"{a,",
+		"{a,{b,c}",
+		"{a,b}{c",
+		"{a/b,c/d",
+		"missing/{a,",
+		"*/{foo",
+		`{a\}`,
+		"{a[}]",
+		`\\{foo`,
+	} {
+		t.Run(pattern, func(t *testing.T) {
+			t.Parallel()
+			t.Run("ValidPattern", func(t *testing.T) {
+				t.Parallel()
+				is := is.New(t)
+				err := ValidPattern(pattern)
+				is.True(err != nil) // unfinished alternatives must be invalid
+				is.Equal("unexpected end of input: unclosed alternative group", err.Error())
+			})
+
+			t.Run("ContainsMatchers", func(t *testing.T) {
+				t.Parallel()
+				is.New(t).True(!ContainsMatchers(pattern))
+			})
+
+			t.Run("Glob", func(t *testing.T) {
+				t.Parallel()
+				is := is.New(t)
+				matches, err := Glob(pattern, WithFs(testFs(t, []string{
+					"a/contents.txt",
+					"foo/contents.txt",
+					"b",
+					"c",
+				}, nil)))
+				t.Logf("Glob(%q) = %q, %v", pattern, matches, err)
+				is.True(err != nil) // reject before returning matches or a filesystem error
+				is.Equal("compile glob pattern: unexpected end of input: unclosed alternative group", err.Error())
+				is.Equal(nil, matches)
+			})
+		})
+	}
+}
+
+func TestGlobValidAlternatives(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		pattern string
+		matches []string
+	}{
+		{"{a/b,c/d}.txt", []string{"a/b.txt", "c/d.txt"}},
+		{"root/{a/b,c/d}.txt", []string{"root/a/b.txt", "root/c/d.txt"}},
+		{"{a/{b,c},d/e}.txt", []string{"a/b.txt", "a/c.txt", "d/e.txt"}},
+		{"{a,{b,c}}.txt", []string{"a.txt", "b.txt", "c.txt"}},
+		{`\{`, []string{"{"}},
+		{`\{foo`, []string{"{foo"}},
+		{`\{a,`, []string{"{a,"}},
+		{"[{].txt", []string{"{.txt"}},
+		{"[}].txt", []string{"}.txt"}},
+		{"[{a].txt", []string{"a.txt", "{.txt"}},
+		{"{a,[}]}.txt", []string{"a.txt", "}.txt"}},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.pattern, func(t *testing.T) {
+			t.Parallel()
+			is := is.New(t)
+			matches, err := Glob(testCase.pattern, WithFs(testFs(t, []string{
+				"a/b.txt",
+				"a/c.txt",
+				"c/d.txt",
+				"d/e.txt",
+				"root/a/b.txt",
+				"root/c/d.txt",
+				"root/c/nope.txt",
+				"a.txt",
+				"b.txt",
+				"c.txt",
+				"nope.txt",
+				"{",
+				"{foo",
+				"{a,",
+				"{.txt",
+				"}.txt",
+			}, nil)))
+			is.NoErr(err)
+			is.Equal(testCase.matches, matches)
+		})
+	}
+}
+
 func TestQuoteMeta(t *testing.T) {
 	t.Parallel()
-	is := is.New(t)
-	matches, err := Glob("{a,b}/c", QuoteMeta, WithFs(testFs(t, []string{
-		"a/c",
-		"b/c",
-		"{a,b}/c",
-	}, nil)))
-	is.NoErr(err)
-	is.Equal([]string{
-		"{a,b}/c",
-	}, matches)
+	for _, pattern := range []string{"{a,b}/c", "{", "{foo", "{a,", "{a/b,c/d"} {
+		t.Run(pattern, func(t *testing.T) {
+			t.Parallel()
+			is := is.New(t)
+			matches, err := Glob(pattern, QuoteMeta, WithFs(testFs(t, []string{
+				"a/c",
+				"b/c",
+				pattern,
+			}, nil)))
+			is.NoErr(err)
+			is.Equal([]string{pattern}, matches)
+		})
+	}
 }
 
 func testFs(tb testing.TB, files, dirs []string) fs.FS {

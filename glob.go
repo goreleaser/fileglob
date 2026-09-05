@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gobwas/glob"
+	"github.com/gobwas/glob/compiler"
 )
 
 const (
@@ -114,7 +115,12 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 	options := compileOptions(opts, pattern)
 
 	pattern = strings.TrimSuffix(strings.TrimPrefix(options.pattern, options.prefix), separatorString)
-	matcher, err := glob.Compile(pattern, separatorRune)
+	rootNode, err := parsePattern(pattern)
+	if err != nil {
+		return matches, fmt.Errorf("compile glob pattern: %w", err)
+	}
+
+	matcher, err := compiler.Compile(rootNode, []rune{separatorRune})
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
 	}

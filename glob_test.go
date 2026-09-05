@@ -33,6 +33,50 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 		is.Equal("&{fs:. matchDirectoriesDirectly:false prefix:./ pattern:*_test.go}", w.String())
 	})
 
+	// https://github.com/goreleaser/fileglob/issues/54
+	t.Run("real with absolute path and no options", func(t *testing.T) {
+		t.Parallel()
+		is := is.New(t)
+
+		wd, err := os.Getwd()
+		is.NoErr(err)
+
+		prefix := "/"
+		if isWindows() {
+			prefix = filepath.VolumeName(wd) + "/"
+		}
+
+		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, WriteOptions(&w))
+		is.NoErr(err)
+		is.Equal([]string{
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
+		is.Equal(fmt.Sprintf(
+			"&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}",
+			prefix, prefix, pattern,
+		), w.String())
+	})
+
+	// https://github.com/goreleaser/fileglob/issues/54
+	t.Run("real with relative path to parent and no options", func(t *testing.T) {
+		t.Parallel()
+		is := is.New(t)
+
+		wd, err := os.Getwd()
+		is.NoErr(err)
+
+		matches, err := Glob("../" + filepath.Base(wd) + "/*_test.go")
+		is.NoErr(err)
+		is.Equal([]string{
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
+	})
+
 	t.Run("real with rootfs", func(t *testing.T) {
 		t.Parallel()
 		is := is.New(t)
@@ -578,7 +622,7 @@ func TestGlobParentPatterns(t *testing.T) {
 				pattern += "/" + tc.suffix
 			}
 			var w bytes.Buffer
-			matches, err := Glob(tc.pattern, MaybeRootFS, WriteOptions(&w))
+			matches, err := Glob(tc.pattern, WriteOptions(&w))
 			is.NoErr(err)
 			is.Equal([]string{toNixPath(filepath.Join(absolute, tc.file))}, matches)
 			is.True(!slices.Contains(matches, toNixPath(filepath.Join(decoy, tc.file))))
@@ -587,6 +631,10 @@ func TestGlobParentPatterns(t *testing.T) {
 				"&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}",
 				prefix, prefix, pattern,
 			), w.String())
+
+			explicitMatches, err := Glob(tc.pattern, MaybeRootFS)
+			is.NoErr(err)
+			is.Equal(matches, explicitMatches)
 		})
 	}
 }
@@ -629,8 +677,12 @@ func TestGlobParentPatternOptions(t *testing.T) {
 		is.NoErr(err)
 		is.True(!slices.Contains(matches, toNixPath(filepath.Join(decoy, "{file}[1].txt"))))
 		is.Equal([]string{toNixPath(filepath.Join(absolute, "{file}[1].txt"))}, matches)
-		is.Equal(fmt.Sprintf("&{fs:. matchDirectoriesDirectly:false prefix:./ pattern:%s}", quoted), before.String())
+		is.Equal(fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, quoted), before.String())
 		is.Equal(fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, quoted), after.String())
+
+		defaultMatches, err := Glob("../{file}[1].txt", QuoteMeta)
+		is.NoErr(err)
+		is.Equal(matches, defaultMatches)
 	})
 
 	t.Run("missing direct file", func(t *testing.T) {
@@ -656,16 +708,26 @@ func TestGlobParentPatternOptions(t *testing.T) {
 		), w.String())
 	})
 
-	t.Run("fs after root", func(t *testing.T) {
+	t.Run("fs after root resets prefix", func(t *testing.T) {
 		is := is.New(t)
 		var w bytes.Buffer
 		matches, err := Glob("../virtual.txt", MaybeRootFS, WithFs(fsys), WriteOptions(&w))
-		is.NoErr(err)
-		is.Equal([]string{toNixPath(filepath.Join(absolute, "virtual.txt"))}, matches)
+		is.True(errors.Is(err, fs.ErrInvalid))
+		is.Equal(nil, matches)
 		is.Equal(fmt.Sprintf(
-			"&{fs:%+v matchDirectoriesDirectly:false prefix:%s pattern:%s/virtual.txt}",
-			fsys, prefix, glob.QuoteMeta(filepath.ToSlash(absolute)),
+			"&{fs:%+v matchDirectoriesDirectly:false prefix:./ pattern:%s/virtual.txt}",
+			fsys, glob.QuoteMeta(filepath.ToSlash(absolute)),
 		), w.String())
+	})
+
+	t.Run("fs uses relative patterns", func(t *testing.T) {
+		is := is.New(t)
+		pattern := strings.TrimPrefix(glob.QuoteMeta(filepath.ToSlash(absolute)), prefix) + "/virtual.txt"
+		matches, err := Glob(pattern, WithFs(fsys))
+		is.NoErr(err)
+		is.Equal([]string{
+			strings.TrimPrefix(toNixPath(filepath.Join(absolute, "virtual.txt")), prefix),
+		}, matches)
 	})
 }
 

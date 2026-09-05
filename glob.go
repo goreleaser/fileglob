@@ -53,7 +53,7 @@ func MaybeRootFS(opts *globOptions) {
 		prefix = separatorString
 	}
 	if vol := filepath.VolumeName(opts.pattern); vol != "" {
-		prefix = vol + "/"
+		prefix = filepath.ToSlash(vol) + "/"
 	}
 	if prefix != "" {
 		opts.prefix = prefix

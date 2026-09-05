@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/caarlos0/testfs"
 	"github.com/gobwas/glob"
@@ -41,7 +42,7 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 
 		prefix := "/"
 		if isWindows() {
-			prefix = filepath.VolumeName(wd) + "/"
+			prefix = filepath.ToSlash(filepath.VolumeName(wd)) + "/"
 		}
 
 		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
@@ -86,7 +87,7 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 
 		prefix := "/"
 		if isWindows() {
-			prefix = filepath.VolumeName(wd) + "/"
+			prefix = filepath.ToSlash(filepath.VolumeName(wd)) + "/"
 		}
 
 		pattern := "../" + dir + "/{file}["
@@ -117,7 +118,7 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 
 		prefix := "/"
 		if isWindows() {
-			prefix = filepath.VolumeName(wd) + "/"
+			prefix = filepath.ToSlash(filepath.VolumeName(wd)) + "/"
 		}
 
 		pattern := "../" + dir + "/*_test.go"
@@ -522,6 +523,77 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 			}, matches)
 		})
 	})
+}
+
+func TestGlobMaybeRootFS(t *testing.T) {
+	t.Parallel()
+	for _, root := range []struct {
+		name    string
+		prefix  string
+		windows bool
+	}{
+		{"unix", "/", false},
+		{"unc", "//host/share/", true},
+		{"drive", "C:/", true},
+	} {
+		t.Run(root.name, func(t *testing.T) {
+			t.Parallel()
+			if root.windows != isWindows() {
+				t.Skip("root syntax belongs to a different platform")
+			}
+			is := is.New(t)
+
+			opts := compileOptions([]OptFunc{MaybeRootFS}, root.prefix+"*.txt")
+			is.Equal(root.prefix, opts.prefix)
+			is.Equal(os.DirFS(root.prefix), opts.fs)
+
+			fsys := fstest.MapFS{
+				"root.txt":            {},
+				"ignore.log":          {},
+				"nested/file.txt":     {},
+				"nested/ignore.log":   {},
+				"{literal}/file.txt":  {},
+				"{literal}/other.log": {},
+			}
+			for _, testCase := range []struct {
+				name    string
+				pattern string
+				opts    []OptFunc
+				files   []string
+			}{
+				{"wildcard", "*.txt", []OptFunc{MaybeRootFS}, []string{"root.txt"}},
+				{"direct file", "root.txt", []OptFunc{MaybeRootFS}, []string{"root.txt"}},
+				{"nested wildcard", "nested/*.txt", []OptFunc{MaybeRootFS}, []string{"nested/file.txt"}},
+				{"escaped wildcard", `\{literal\}/*.txt`, []OptFunc{MaybeRootFS}, []string{"{literal}/file.txt"}},
+				{"escaped direct file", `\{literal\}/file.txt`, []OptFunc{MaybeRootFS}, []string{"{literal}/file.txt"}},
+				{"quote before root", "{literal}/file.txt", []OptFunc{QuoteMeta, MaybeRootFS}, []string{"{literal}/file.txt"}},
+				{"quote after root", "{literal}/file.txt", []OptFunc{MaybeRootFS, QuoteMeta}, []string{"{literal}/file.txt"}},
+				{"directory contents", "nested", []OptFunc{MaybeRootFS}, []string{"nested/file.txt", "nested/ignore.log"}},
+				{"directory as file", "nested", []OptFunc{MaybeRootFS, MatchDirectoryAsFile}, []string{"nested"}},
+			} {
+				t.Run(testCase.name, func(t *testing.T) {
+					t.Parallel()
+					is := is.New(t)
+					matches, err := Glob(root.prefix+testCase.pattern, append(testCase.opts, WithFs(fsys))...)
+					is.NoErr(err)
+					want := make([]string, len(testCase.files))
+					for i, file := range testCase.files {
+						want[i] = root.prefix + file
+					}
+					is.Equal(want, matches)
+				})
+			}
+
+			t.Run("missing direct file", func(t *testing.T) {
+				t.Parallel()
+				is := is.New(t)
+				matches, err := Glob(root.prefix+"missing.txt", MaybeRootFS, WithFs(fsys))
+				is.True(errors.Is(err, fs.ErrNotExist))
+				is.Equal(fmt.Sprintf("matching %q: file does not exist", root.prefix+"missing.txt"), err.Error())
+				is.Equal([]string{}, matches)
+			})
+		})
+	}
 }
 
 func TestQuoteMeta(t *testing.T) {

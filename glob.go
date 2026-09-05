@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -28,6 +29,9 @@ type globOptions struct {
 	prefix string
 
 	pattern string
+
+	// literalPrefix is already quoted and must not be quoted again by QuoteMeta.
+	literalPrefix string
 }
 
 // OptFunc is a function that allow to customize Glob.
@@ -64,7 +68,8 @@ func MaybeRootFS(opts *globOptions) {
 // WriteOptions write the current options to the given writer.
 func WriteOptions(w io.Writer) OptFunc {
 	return func(opts *globOptions) {
-		_, _ = fmt.Fprintf(w, "%+v", opts)
+		_, _ = fmt.Fprintf(w, "&{fs:%+v matchDirectoriesDirectly:%t prefix:%s pattern:%s}",
+			opts.fs, opts.matchDirectoriesDirectly, opts.prefix, opts.pattern)
 	}
 }
 
@@ -88,7 +93,7 @@ func MatchDirectoryAsFile(opts *globOptions) {
 // QuoteMeta quotes all glob pattern meta characters inside the argument text.
 // For example, QuoteMeta for a pattern `{foo*}` sets the pattern to `\{foo\*\}`.
 func QuoteMeta(opts *globOptions) {
-	opts.pattern = glob.QuoteMeta(opts.pattern)
+	opts.pattern = opts.literalPrefix + glob.QuoteMeta(strings.TrimPrefix(opts.pattern, opts.literalPrefix))
 }
 
 // toNixPath converts the path to the nix style path
@@ -100,18 +105,28 @@ func toNixPath(s string) string {
 // Glob returns all files that match the given pattern in the current directory.
 // If the given pattern indicates an absolute path, it will glob from `/`.
 // If the given pattern starts with `../`, it will resolve to its absolute path and glob from `/`.
+// Metacharacters in the resolved working-directory prefix are treated literally.
 func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,cyclop
 	var matches []string
 
+	literalPrefix := ""
 	if strings.HasPrefix(pattern, "../") {
-		p, err := filepath.Abs(pattern)
+		// Clean glob paths without treating user escapes as Windows separators.
+		relative := path.Clean(pattern)
+		parents := 0
+		for relative == ".." || strings.HasPrefix(relative, "../") {
+			parents++
+			relative = strings.TrimPrefix(strings.TrimPrefix(relative, ".."), "/")
+		}
+		p, err := filepath.Abs(strings.Repeat("../", parents))
 		if err != nil {
 			return matches, fmt.Errorf("failed to resolve pattern: %s: %w", pattern, err)
 		}
-		pattern = filepath.ToSlash(p)
+		literalPrefix = glob.QuoteMeta(filepath.ToSlash(p))
+		pattern = joinParentPattern(literalPrefix, relative)
 	}
 
-	options := compileOptions(opts, pattern)
+	options := compileOptions(opts, pattern, literalPrefix)
 
 	pattern = strings.TrimSuffix(strings.TrimPrefix(options.pattern, options.prefix), separatorString)
 	matcher, err := glob.Compile(pattern, separatorRune)
@@ -195,11 +210,23 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 	return cleanFilepaths(matches, options.prefix), nil
 }
 
-func compileOptions(optFuncs []OptFunc, pattern string) *globOptions {
+func joinParentPattern(literalPrefix, relative string) string {
+	// Keep OS-specific roots intact instead of cleaning them as POSIX paths.
+	if relative == "" {
+		return literalPrefix
+	}
+	if !strings.HasSuffix(literalPrefix, separatorString) {
+		literalPrefix += separatorString
+	}
+	return literalPrefix + relative
+}
+
+func compileOptions(optFuncs []OptFunc, pattern, literalPrefix string) *globOptions {
 	opts := &globOptions{
-		fs:      os.DirFS("."),
-		prefix:  "./",
-		pattern: pattern,
+		fs:            os.DirFS("."),
+		prefix:        "./",
+		pattern:       pattern,
+		literalPrefix: literalPrefix,
 	}
 
 	for _, apply := range optFuncs {

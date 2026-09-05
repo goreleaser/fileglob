@@ -32,6 +32,50 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 		is.Equal("&{fs:. matchDirectoriesDirectly:false prefix:./ pattern:*_test.go}", w.String())
 	})
 
+	// https://github.com/goreleaser/fileglob/issues/54
+	t.Run("real with absolute path and no options", func(t *testing.T) {
+		t.Parallel()
+		is := is.New(t)
+
+		wd, err := os.Getwd()
+		is.NoErr(err)
+
+		prefix := "/"
+		if isWindows() {
+			prefix = filepath.VolumeName(wd) + "/"
+		}
+
+		pattern := toNixPath(filepath.Join(wd, "*_test.go"))
+
+		var w bytes.Buffer
+		matches, err := Glob(pattern, WriteOptions(&w))
+		is.NoErr(err)
+		is.Equal([]string{
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
+		is.Equal(fmt.Sprintf(
+			"&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}",
+			prefix, prefix, pattern,
+		), w.String())
+	})
+
+	// https://github.com/goreleaser/fileglob/issues/54
+	t.Run("real with relative path to parent and no options", func(t *testing.T) {
+		t.Parallel()
+		is := is.New(t)
+
+		wd, err := os.Getwd()
+		is.NoErr(err)
+
+		matches, err := Glob("../" + filepath.Base(wd) + "/*_test.go")
+		is.NoErr(err)
+		is.Equal([]string{
+			toNixPath(filepath.Join(wd, "glob_test.go")),
+			toNixPath(filepath.Join(wd, "prefix_test.go")),
+		}, matches)
+	})
+
 	t.Run("real with rootfs", func(t *testing.T) {
 		t.Parallel()
 		is := is.New(t)

@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/caarlos0/testfs"
 	"github.com/gobwas/glob"
@@ -522,6 +523,99 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 			}, matches)
 		})
 	})
+}
+
+func TestGlobFSPaths(t *testing.T) {
+	t.Parallel()
+	fsys := fstest.MapFS{
+		`a\b.txt`:              {},
+		"a/b.txt":              {},
+		`dir/a\b.txt`:          {},
+		`dir\a/b.txt`:          {},
+		`dir\a/nested/c\d.txt`: {},
+	}
+	for name := range fsys {
+		is.New(t).True(fs.ValidPath(name))
+	}
+
+	testCases := []struct {
+		name    string
+		pattern string
+		opts    []OptFunc
+		matches []string
+	}{
+		{
+			name:    "wildcard file",
+			pattern: "*.txt",
+			matches: []string{`a\b.txt`},
+		},
+		{
+			name:    "wildcard nested file",
+			pattern: "dir/*.txt",
+			matches: []string{`dir/a\b.txt`},
+		},
+		{
+			name:    "wildcard inside backslash directory",
+			pattern: `dir\\a/*.txt`,
+			matches: []string{`dir\a/b.txt`},
+		},
+		{
+			name:    "directory contents by default",
+			pattern: "dir",
+			matches: []string{`dir/a\b.txt`},
+		},
+		{
+			name:    "wildcard directory contents",
+			pattern: "dir**",
+			opts:    []OptFunc{MatchDirectoryIncludesContents},
+			matches: []string{`dir/a\b.txt`, `dir\a/b.txt`, `dir\a/nested/c\d.txt`},
+		},
+		{
+			name:    "wildcard directories as files",
+			pattern: "dir*",
+			opts:    []OptFunc{MatchDirectoryAsFile},
+			matches: []string{"dir", `dir\a`},
+		},
+		{
+			name:    "quoted file",
+			pattern: `a\b.txt`,
+			opts:    []OptFunc{QuoteMeta},
+			matches: []string{`a\b.txt`},
+		},
+		{
+			name:    "quoted nested file",
+			pattern: `dir/a\b.txt`,
+			opts:    []OptFunc{QuoteMeta},
+			matches: []string{`dir/a\b.txt`},
+		},
+		{
+			name:    "quoted directory contents",
+			pattern: `dir\a`,
+			opts:    []OptFunc{QuoteMeta},
+			matches: []string{`dir\a/b.txt`, `dir\a/nested/c\d.txt`},
+		},
+		{
+			name:    "quoted directory as file",
+			pattern: `dir\a`,
+			opts:    []OptFunc{QuoteMeta, MatchDirectoryAsFile},
+			matches: []string{`dir\a`},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			is := is.New(t)
+			opts := append([]OptFunc{WithFs(fsys)}, testCase.opts...)
+			matches, err := Glob(testCase.pattern, opts...)
+			is.NoErr(err)
+			is.Equal(testCase.matches, matches)
+			for _, match := range matches {
+				_, err := fs.Stat(fsys, match)
+				is.NoErr(err)
+			}
+		})
+	}
 }
 
 func TestQuoteMeta(t *testing.T) {

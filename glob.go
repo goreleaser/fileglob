@@ -162,8 +162,6 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 			return err
 		}
 
-		// The glob ast from github.com/gobwas/glob only works properly with linux paths
-		path = toNixPath(path)
 		if !matcher.Match(path) {
 			return nil
 		}
@@ -219,7 +217,6 @@ func filesInDirectory(options *globOptions, dir string) ([]string, error) {
 		if info.IsDir() {
 			return nil
 		}
-		path = toNixPath(path)
 		files = append(files, path)
 		return nil
 	})

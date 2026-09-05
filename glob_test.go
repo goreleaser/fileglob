@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/caarlos0/testfs"
 	"github.com/gobwas/glob"
@@ -522,6 +524,317 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 			}, matches)
 		})
 	})
+}
+
+func TestGlobPrunesDirectories(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		pattern string
+		option  OptFunc
+		blocked string
+		matches []string
+	}{
+		{
+			name:    "literal root directory",
+			pattern: ".",
+			option:  MatchDirectoryAsFile,
+			blocked: ".",
+			matches: []string{"."},
+		},
+		{
+			name:    "single root alternative",
+			pattern: "{.}",
+			option:  MatchDirectoryAsFile,
+			blocked: ".",
+			matches: []string{"."},
+		},
+		{
+			name:    "duplicate root alternatives",
+			pattern: "{.,.}",
+			option:  MatchDirectoryAsFile,
+			blocked: ".",
+			matches: []string{"."},
+		},
+		{
+			name:    "literal directory",
+			pattern: "blocked",
+			option:  MatchDirectoryAsFile,
+			blocked: "blocked",
+			matches: []string{"blocked"},
+		},
+		{
+			name:    "matching directory wildcard",
+			pattern: "block*",
+			option:  MatchDirectoryAsFile,
+			blocked: "blocked",
+			matches: []string{"blocked"},
+		},
+		{
+			name:    "unrelated directory",
+			pattern: "*.txt",
+			option:  MatchDirectoryIncludesContents,
+			blocked: "blocked",
+			matches: []string{"file.txt"},
+		},
+		{
+			name:    "unrelated directory in direct mode",
+			pattern: "*.txt",
+			option:  MatchDirectoryAsFile,
+			blocked: "blocked",
+			matches: []string{"file.txt"},
+		},
+		{
+			name:    "no matches",
+			pattern: "*.missing",
+			option:  MatchDirectoryIncludesContents,
+			blocked: "blocked",
+		},
+		{
+			name:    "nested static prefix",
+			pattern: "nested/*.txt",
+			option:  MatchDirectoryIncludesContents,
+			blocked: "nested/blocked",
+			matches: []string{"nested/file.txt"},
+		},
+		{
+			name:    "nested wildcard prefix",
+			pattern: "*/*.txt",
+			option:  MatchDirectoryIncludesContents,
+			blocked: "nested/blocked",
+			matches: []string{"blocked/private.txt", "nested/file.txt"},
+		},
+		{
+			name:    "alternatives at different depths",
+			pattern: "{nested,nested/blocked}",
+			option:  MatchDirectoryAsFile,
+			blocked: "nested/blocked",
+			matches: []string{"nested", "nested/blocked"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			is := is.New(t)
+			fsys := &readDirFS{
+				FS: fstest.MapFS{
+					"blocked/private.txt":        &fstest.MapFile{},
+					"file.txt":                   &fstest.MapFile{},
+					"nested/blocked/private.txt": &fstest.MapFile{},
+					"nested/file.txt":            &fstest.MapFile{},
+				},
+				blocked: tc.blocked,
+			}
+			matches, err := Glob(tc.pattern, WithFs(fsys), tc.option)
+			is.NoErr(err)
+			is.Equal(tc.matches, matches)
+			is.True(!slices.Contains(fsys.readDirs, tc.blocked))
+		})
+	}
+}
+
+func TestGlobPreservesDescendants(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		pattern string
+		options []OptFunc
+		matches []string
+	}{
+		{
+			pattern: "*",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{".", "dir", "file.txt"},
+		},
+		{
+			pattern: "**",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{
+				".", "dir", "dir/file.txt", "dir/sub", "dir/sub/deep",
+				"dir/sub/deep/file.txt", "dir/sub/file.txt", "file.txt",
+			},
+		},
+		{
+			pattern: "{.,file.txt}",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{".", "file.txt"},
+		},
+		{
+			pattern: "{.,dir/sub/file.txt}",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{".", "dir/sub/file.txt"},
+		},
+		{
+			pattern: "{.,**}",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{
+				".", "dir", "dir/file.txt", "dir/sub", "dir/sub/deep",
+				"dir/sub/deep/file.txt", "dir/sub/file.txt", "file.txt",
+			},
+		},
+		{
+			pattern: "{dir}",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{"dir"},
+		},
+		{
+			pattern: "dir/**",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{
+				"dir/file.txt", "dir/sub", "dir/sub/deep",
+				"dir/sub/deep/file.txt", "dir/sub/file.txt",
+			},
+		},
+		{
+			pattern: "*/*/*.txt",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{"dir/sub/file.txt"},
+		},
+		{
+			pattern: "dir[.-0]sub/file.txt",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{"dir/sub/file.txt"},
+		},
+		{
+			pattern: "dir[!a-z]sub/file.txt",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{"dir/sub/file.txt"},
+		},
+		{
+			pattern: "dir[!xyz]sub/file.txt",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{"dir/sub/file.txt"},
+		},
+		{
+			pattern: "{dir,dir/sub/file.txt}",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{"dir", "dir/sub/file.txt"},
+		},
+		{
+			pattern: "{dir,{dir/sub,dir/sub/deep/file.txt}}",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{"dir", "dir/sub", "dir/sub/deep/file.txt"},
+		},
+		{
+			pattern: "{dir,dir/sub}/{file.txt,deep/file.txt}",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{"dir/file.txt", "dir/sub/deep/file.txt", "dir/sub/file.txt"},
+		},
+		{
+			pattern: "{dir,dir/**}",
+			options: []OptFunc{MatchDirectoryAsFile},
+			matches: []string{
+				"dir", "dir/file.txt", "dir/sub", "dir/sub/deep",
+				"dir/sub/deep/file.txt", "dir/sub/file.txt",
+			},
+		},
+		{
+			pattern: ".",
+			matches: []string{"dir/file.txt", "dir/sub/deep/file.txt", "dir/sub/file.txt", "file.txt"},
+		},
+		{
+			pattern: "{.}",
+			options: []OptFunc{MatchDirectoryIncludesContents},
+			matches: []string{"dir/file.txt", "dir/sub/deep/file.txt", "dir/sub/file.txt", "file.txt"},
+		},
+		{
+			pattern: "*",
+			options: []OptFunc{MatchDirectoryIncludesContents},
+			matches: []string{"dir/file.txt", "dir/sub/deep/file.txt", "dir/sub/file.txt", "file.txt"},
+		},
+		{
+			pattern: "**",
+			matches: []string{"dir/file.txt", "dir/sub/deep/file.txt", "dir/sub/file.txt", "file.txt"},
+		},
+		{
+			pattern: "dir",
+			matches: []string{"dir/file.txt", "dir/sub/deep/file.txt", "dir/sub/file.txt"},
+		},
+		{
+			pattern: "d*",
+			options: []OptFunc{MatchDirectoryIncludesContents},
+			matches: []string{"dir/file.txt", "dir/sub/deep/file.txt", "dir/sub/file.txt"},
+		},
+		{
+			pattern: "dir/sub",
+			options: []OptFunc{MatchDirectoryAsFile, MatchDirectoryIncludesContents},
+			matches: []string{"dir/sub/deep/file.txt", "dir/sub/file.txt"},
+		},
+	} {
+		t.Run(tc.pattern, func(t *testing.T) {
+			t.Parallel()
+			is := is.New(t)
+			fsys := fstest.MapFS{
+				"dir/file.txt":          &fstest.MapFile{},
+				"dir/sub/deep/file.txt": &fstest.MapFile{},
+				"dir/sub/file.txt":      &fstest.MapFile{},
+				"file.txt":              &fstest.MapFile{},
+			}
+			matches, err := Glob(tc.pattern, append(tc.options, WithFs(fsys))...)
+			is.NoErr(err)
+			is.Equal(tc.matches, matches)
+		})
+	}
+}
+
+func TestGlobRequiredDirectoryReadErrors(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		pattern string
+		options []OptFunc
+		blocked string
+	}{
+		{"default expansion", "blocked", nil, "blocked"},
+		{"explicit expansion", "blocked", []OptFunc{MatchDirectoryIncludesContents}, "blocked"},
+		{"matching wildcard expansion", "block*", nil, "blocked"},
+		{"nested pattern", "blocked/*.txt", []OptFunc{MatchDirectoryAsFile}, "blocked"},
+		{"wildcard prefix", "*/*.txt", []OptFunc{MatchDirectoryAsFile}, "blocked"},
+		{"recursive expansion", "**", nil, "blocked"},
+		{"recursive direct match", "**", []OptFunc{MatchDirectoryAsFile}, "blocked"},
+		{"recursive static prefix", "blocked/**", []OptFunc{MatchDirectoryAsFile}, "blocked"},
+		{"deeper alternative", "{blocked,blocked/private.txt}", []OptFunc{MatchDirectoryAsFile}, "blocked"},
+		{"root enumeration", "*.txt", nil, "."},
+		{"root default expansion", ".", nil, "."},
+		{"root explicit expansion", ".", []OptFunc{MatchDirectoryIncludesContents}, "."},
+		{"root alternative expansion", "{.}", nil, "."},
+		{"single wildcard root", "*", []OptFunc{MatchDirectoryAsFile}, "."},
+		{"recursive wildcard root", "**", []OptFunc{MatchDirectoryAsFile}, "."},
+		{"root with sibling alternative", "{.,file.txt}", []OptFunc{MatchDirectoryAsFile}, "."},
+		{"root with descendant alternative", "{.,blocked/private.txt}", []OptFunc{MatchDirectoryAsFile}, "blocked"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			is := is.New(t)
+			fsys := &readDirFS{
+				FS: fstest.MapFS{
+					"blocked/private.txt": &fstest.MapFile{},
+					"file.txt":            &fstest.MapFile{},
+				},
+				blocked: tc.blocked,
+			}
+			matches, err := Glob(tc.pattern, append(tc.options, WithFs(fsys))...)
+			is.True(errors.Is(err, fs.ErrPermission))
+			var pathErr *fs.PathError
+			is.True(errors.As(err, &pathErr))
+			is.Equal(tc.blocked, pathErr.Path)
+			is.Equal("readdir", pathErr.Op)
+			is.Equal(nil, matches)
+			is.True(slices.Contains(fsys.readDirs, tc.blocked))
+		})
+	}
+}
+
+type readDirFS struct {
+	fs.FS
+	blocked  string
+	readDirs []string
+}
+
+func (f *readDirFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	f.readDirs = append(f.readDirs, name)
+	if name == f.blocked {
+		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrPermission}
+	}
+	return fs.ReadDir(f.FS, name)
 }
 
 func TestQuoteMeta(t *testing.T) {

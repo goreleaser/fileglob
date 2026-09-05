@@ -94,3 +94,42 @@ func staticPrefix(pattern string) (string, error) {
 
 	return prefix, nil
 }
+
+// maxPathSeparators bounds the number of separators in a match.
+// A negative result means unbounded or unknown, so the walk must not prune.
+func maxPathSeparators(node *ast.Node) int {
+	switch node.Kind {
+	case ast.KindPattern, ast.KindAnyOf:
+		var count int
+		for _, child := range node.Children {
+			n := maxPathSeparators(child)
+			if n < 0 {
+				return -1
+			}
+			if node.Kind == ast.KindAnyOf {
+				count = max(count, n)
+			} else {
+				count += n
+			}
+		}
+		return count
+	case ast.KindText:
+		return strings.Count(node.Value.(ast.Text).Text, separatorString)
+	case ast.KindNothing, ast.KindAny, ast.KindSingle:
+		return 0
+	case ast.KindList:
+		list := node.Value.(ast.List)
+		if strings.ContainsRune(list.Chars, separatorRune) != list.Not {
+			return 1
+		}
+		return 0
+	case ast.KindRange:
+		r := node.Value.(ast.Range)
+		if (r.Lo <= separatorRune && separatorRune <= r.Hi) != r.Not {
+			return 1
+		}
+		return 0
+	default:
+		return -1
+	}
+}

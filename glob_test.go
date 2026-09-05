@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/caarlos0/testfs"
 	"github.com/gobwas/glob"
@@ -522,6 +524,78 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 			}, matches)
 		})
 	})
+}
+
+func TestGlobSyntaxPrefix(t *testing.T) {
+	t.Parallel()
+	fsys := fstest.MapFS{
+		"afile.txt":      {},
+		"bfile.txt":      {},
+		"file.txt":       {},
+		"a/file.txt":     {},
+		"a/afile.txt":    {},
+		"abfile.txt":     {},
+		"acfile.txt":     {},
+		"a/b.txt":        {},
+		"a/d.txt":        {},
+		"c/d.txt":        {},
+		"dir/afile.txt":  {},
+		"dir/file.txt":   {},
+		"dir/a/file.txt": {},
+		"dir/a.file.txt": {},
+		"dir/a0file.txt": {},
+		"dir/a1file.txt": {},
+		"dir/a/b.txt":    {},
+		"dir/a/c.txt":    {},
+		"dir/c/d.txt":    {},
+		"dir/d/e.txt":    {},
+		"dir/d/f.txt":    {},
+		"fo*o/afile.txt": {},
+		"foo/afile.txt":  {},
+		"fo*o/file.txt":  {},
+		"dir/?/file.txt": {},
+		"{a}/file.txt":   {},
+		"{a/b,c/d}.txt":  {},
+	}
+	testCases := []struct {
+		pattern string
+		matches []string
+	}{
+		{"[!/]file.txt", []string{"afile.txt", "bfile.txt"}},
+		{"a[/]file.txt", []string{"a/file.txt"}},
+		{"a[/b]file.txt", []string{"a/file.txt", "abfile.txt"}},
+		{"dir/[!/]file.txt", []string{"dir/afile.txt"}},
+		{"dir/a[/]file.txt", []string{"dir/a/file.txt"}},
+		{"dir/a[.-0]file.txt", []string{"dir/a.file.txt", "dir/a/file.txt", "dir/a0file.txt"}},
+		{"{a/b,c/d}.txt", []string{"a/b.txt", "c/d.txt"}},
+		{"dir/{a/b,c/d}.txt", []string{"dir/a/b.txt", "dir/c/d.txt"}},
+		{"dir/{a/{b,c},d/e}.txt", []string{"dir/a/b.txt", "dir/a/c.txt", "dir/d/e.txt"}},
+		{"fo\\*o/[!/]file.txt", []string{"fo*o/afile.txt"}},
+		{"fo\\*o/file.txt", []string{"fo*o/file.txt"}},
+		{"dir/\\?/file.txt", []string{"dir/?/file.txt"}},
+		{"\\{a\\}/file.txt", []string{"{a}/file.txt"}},
+		{"\\{a/b,c/d\\}.txt", []string{"{a/b,c/d}.txt"}},
+		{"a\\/[!/]file.txt", []string{"a/afile.txt"}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.pattern, func(t *testing.T) {
+			t.Parallel()
+			assert := is.New(t)
+			assert.NoErr(ValidPattern(testCase.pattern))
+			matcher, err := glob.Compile(testCase.pattern, separatorRune)
+			assert.NoErr(err)
+			for name := range fsys {
+				t.Run(name, func(t *testing.T) {
+					is.New(t).Equal(slices.Contains(testCase.matches, name), matcher.Match(name))
+				})
+			}
+			matches, err := Glob(testCase.pattern, WithFs(fsys))
+			assert.NoErr(err)
+			slices.Sort(matches)
+			assert.Equal(testCase.matches, matches)
+		})
+	}
 }
 
 func TestQuoteMeta(t *testing.T) {

@@ -22,6 +22,33 @@ func TestStaticPrefix(t *testing.T) {
 		{"fo\\*o/bar/b*z", "fo*o/bar"},
 		{"/\\{foo\\}/bar", "/{foo}/bar"},
 		{"C:/Path/To/Some/File", "C:/Path/To/Some/File"},
+		{"[!/]file.txt", "."},
+		{"a[/]file.txt", "."},
+		{"a[/b]file.txt", "."},
+		{"dir/[!/]file.txt", "dir"},
+		{"dir/a[/]file.txt", "dir"},
+		{"dir/a[.-0]file.txt", "dir"},
+		{"{a/b,c/d}.txt", "."},
+		{"dir/{a/b,c/d}.txt", "dir"},
+		{"dir/{a/{b,c},d/e}.txt", "dir"},
+		{"dir/pre{a/b,c/d}/file.txt", "dir"},
+		{"dir/*/{a/b,c/d}.txt", "dir"},
+		{"fo\\*o/[!/]file.txt", "fo*o"},
+		{"fo\\*o/file.txt", "fo*o/file.txt"},
+		{"dir/\\?/file.txt", "dir/?/file.txt"},
+		{"\\{a/b,c/d\\}.txt", "{a/b,c/d}.txt"},
+		{"a\\/[!/]file.txt", "a"},
+		{"/[!/]file.txt", "/"},
+		{"/a[/]file.txt", "/"},
+		{"/dir/[!/]file.txt", "/dir"},
+		{"/{a/b,c/d}.txt", "/"},
+		{"\\/[!/]file.txt", "/"},
+		{"C:/Path/[!/]file.txt", "C:/Path"},
+		{"//foo///bar/*", "/foo/bar"},
+		{"foo///bar/", "foo/bar"},
+		{"foo/../bar/*", "foo/../bar"},
+		{"/", "/"},
+		{"", "."},
 	}
 
 	for _, testCase := range testCases {
@@ -33,6 +60,15 @@ func TestStaticPrefix(t *testing.T) {
 			is.Equal(testCase.prefix, prefix)
 		})
 	}
+}
+
+func TestStaticPrefixInvalidPattern(t *testing.T) {
+	t.Parallel()
+	is := is.New(t)
+	prefix, err := staticPrefix("[!/")
+	is.True(err != nil)
+	is.Equal(err.Error(), "parse glob pattern: unexpected end of input")
+	is.Equal(prefix, "")
 }
 
 func TestContainsMatchers(t *testing.T) {

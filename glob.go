@@ -18,7 +18,8 @@ const (
 )
 
 type globOptions struct {
-	fs fs.FS
+	fs        fs.FS
+	defaultFS bool
 
 	// if matchDirectories directly is set to true a matching directory will
 	// be treated just like a matching file. If set to false, a matching directory
@@ -37,6 +38,7 @@ type OptFunc func(opts *globOptions)
 func WithFs(f fs.FS) OptFunc {
 	return func(opts *globOptions) {
 		opts.fs = f
+		opts.defaultFS = false
 	}
 }
 
@@ -58,13 +60,15 @@ func MaybeRootFS(opts *globOptions) {
 	if prefix != "" {
 		opts.prefix = prefix
 		opts.fs = os.DirFS(prefix)
+		opts.defaultFS = false
 	}
 }
 
 // WriteOptions write the current options to the given writer.
 func WriteOptions(w io.Writer) OptFunc {
 	return func(opts *globOptions) {
-		_, _ = fmt.Fprintf(w, "%+v", opts)
+		_, _ = fmt.Fprintf(w, "&{fs:%+v matchDirectoriesDirectly:%t prefix:%s pattern:%s}",
+			opts.fs, opts.matchDirectoriesDirectly, opts.prefix, opts.pattern)
 	}
 }
 
@@ -124,17 +128,30 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 		return nil, fmt.Errorf("cannot determine static prefix: %w", err)
 	}
 
-	// Check if the file is valid symlink without following it
-	// It works only for valid absolut or relative file paths, in other words, will fail for WithFs() option
-	if patternInfo, err := os.Lstat(pattern); err == nil {
-		if patternInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
-			return cleanFilepaths([]string{pattern}, options.prefix), nil
+	hasMatchers := ContainsMatchers(pattern)
+
+	// Preserve absolute symlink matches without enabling root globbing by default.
+	if options.defaultFS && filepath.IsAbs(pattern) {
+		name, literal := prefix, !hasMatchers
+		if filepath.Separator == '\\' && !strings.Contains(pattern, separatorString) {
+			name = pattern
+			literal = !ContainsMatchers(filepath.ToSlash(pattern))
+		}
+		if literal {
+			if info, err := os.Lstat(name); err == nil && info.Mode()&fs.ModeSymlink != 0 {
+				return []string{name}, nil
+			}
 		}
 	}
 
-	prefixInfo, err := fs.Stat(options.fs, prefix)
+	var prefixInfo fs.FileInfo
+	if hasMatchers {
+		prefixInfo, err = fs.Stat(options.fs, prefix)
+	} else {
+		prefixInfo, err = fs.Lstat(options.fs, prefix)
+	}
 	if errors.Is(err, fs.ErrNotExist) {
-		if !ContainsMatchers(pattern) {
+		if !hasMatchers {
 			// glob contains no dynamic matchers so prefix is the file name that
 			// the glob references directly. When the glob explicitly references
 			// a single non-existing file, return an error for the user to check.
@@ -197,9 +214,10 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 
 func compileOptions(optFuncs []OptFunc, pattern string) *globOptions {
 	opts := &globOptions{
-		fs:      os.DirFS("."),
-		prefix:  "./",
-		pattern: pattern,
+		fs:        os.DirFS("."),
+		defaultFS: true,
+		prefix:    "./",
+		pattern:   pattern,
 	}
 
 	for _, apply := range optFuncs {

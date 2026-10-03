@@ -81,3 +81,43 @@ func TestValidPattern(t *testing.T) {
 		})
 	}
 }
+
+func TestMaxPathSeparators(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		pattern string
+		count   int
+	}{
+		{"", 0},
+		{".", 0},
+		{"blocked", 0},
+		{"*.txt", 0},
+		{"a/?/file.txt", 2},
+		{"a/*/*.txt", 2},
+		{"**", -1},
+		{"a/**/file.txt", -1},
+		{`a/\*\*/file.txt`, 2},
+		{`a\/file.txt`, 1},
+		{"{a,b/c}", 1},
+		{"{a/b,c/d}.txt", 1},
+		{"{a,{b/c,d/e/f}}", 2},
+		{"{a/b,c}/{d,e/f}", 3},
+		{"{a,{b/**,c}}", -1},
+		{"a[/]b", 1},
+		{"[!/]file.txt", 0},
+		{"[abc]", 0},
+		{"[!abc]", 1},
+		{"[.-0]", 1},
+		{"[!.-0]", 0},
+		{"[a-z]", 0},
+		{"[!a-z]", 1},
+	} {
+		t.Run(tc.pattern, func(t *testing.T) {
+			t.Parallel()
+			is := is.New(t)
+			node, err := ast.Parse(lexer.NewLexer(tc.pattern))
+			is.NoErr(err)
+			is.Equal(tc.count, maxPathSeparators(node))
+		})
+	}
+}

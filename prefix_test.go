@@ -22,6 +22,9 @@ func TestStaticPrefix(t *testing.T) {
 		{"fo\\*o/bar/b*z", "fo*o/bar"},
 		{"/\\{foo\\}/bar", "/{foo}/bar"},
 		{"C:/Path/To/Some/File", "C:/Path/To/Some/File"},
+		{"{a/b,c/d}.txt", "."},
+		{"root/{a/b,c/d}.txt", "root"},
+		{"/root/{a/{b,c},d/e}.txt", "/root"},
 	}
 
 	for _, testCase := range testCases {
@@ -50,6 +53,15 @@ func TestContainsMatchers(t *testing.T) {
 		{"\\{*\\}", true},
 		{"{a,b}/c", true},
 		{"\\{\\\\[a-z]", true},
+		{"{a/b,c/d}.txt", true},
+		{"{a,{b,c}}", true},
+		{"{a,[}]}", true},
+		{"[{]", true},
+		{"[}]", true},
+		{`\{`, false},
+		{`\{foo`, false},
+		{`\{a,`, false},
+		{"}", false},
 	}
 
 	for _, testCase := range testCases {
@@ -72,6 +84,15 @@ func TestValidPattern(t *testing.T) {
 		{"/a/*/b", true},
 		{"{a[", false},
 		{"[*]", true},
+		{"{a/b,c/d}.txt", true},
+		{"{a,{b,c}}", true},
+		{"{a,[}]}", true},
+		{"[{]", true},
+		{"[}]", true},
+		{`\{`, true},
+		{`\{foo`, true},
+		{`\{a,`, true},
+		{"}", true},
 	}
 
 	for _, testCase := range testCases {

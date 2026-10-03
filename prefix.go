@@ -9,22 +9,52 @@ import (
 )
 
 // ValidPattern determines whether a pattern is valid. It returns the parser
-// error if the pattern is invalid and nil otherwise.
+// error if the pattern is invalid and nil otherwise. Alternative groups must
+// be closed.
 func ValidPattern(pattern string) error {
-	_, err := ast.Parse(lexer.NewLexer(pattern))
+	_, err := parsePattern(pattern)
 	return err //nolint:wrapcheck
 }
 
 // ContainsMatchers determines whether the pattern contains any type of glob
 // matcher. It will also return false if the pattern is an invalid expression.
 func ContainsMatchers(pattern string) bool {
-	rootNode, err := ast.Parse(lexer.NewLexer(pattern))
+	rootNode, err := parsePattern(pattern)
 	if err != nil {
 		return false
 	}
 
 	_, isStatic := staticText(rootNode)
 	return !isStatic
+}
+
+func parsePattern(pattern string) (*ast.Node, error) {
+	return ast.Parse(&patternLexer{Lexer: lexer.NewLexer(pattern)})
+}
+
+// patternLexer rejects unclosed alternatives in complete patterns.
+// staticPrefix uses the upstream lexer because it parses partial path elements.
+type patternLexer struct {
+	ast.Lexer
+	depth int
+}
+
+func (l *patternLexer) Next() lexer.Token {
+	token := l.Lexer.Next()
+	switch token.Type {
+	case lexer.TermsOpen:
+		l.depth++
+	case lexer.TermsClose:
+		l.depth--
+	case lexer.EOF:
+		if l.depth > 0 {
+			return lexer.Token{
+				Type: lexer.Error,
+				Raw:  "unexpected end of input: unclosed alternative group",
+			}
+		}
+	}
+	return token
 }
 
 // staticText returns the static string matcher represented by the AST unless

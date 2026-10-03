@@ -8,6 +8,32 @@ import (
 	"github.com/matryer/is"
 )
 
+func TestJoinParentPattern(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		prefix   string
+		relative string
+		pattern  string
+	}{
+		{"UNC wildcard", "//host/share", "*.txt", "//host/share/*.txt"},
+		{"UNC empty suffix", "//host/share", "", "//host/share"},
+		{"UNC trailing separator", "//host/share/", "*.txt", "//host/share/*.txt"},
+		{"drive root empty suffix", "C:/", "", "C:/"},
+		{"drive root wildcard", "C:/", "*.txt", "C:/*.txt"},
+		{"Unix root empty suffix", "/", "", "/"},
+		{"Unix root wildcard", "/", "*.txt", "/*.txt"},
+		{"escaped UNC path", `//host/share/build\[1\]`, `file\[1\].txt`, `//host/share/build\[1\]/file\[1\].txt`},
+		{"escaped drive path", `C:/build\[1\]`, "file?.txt", `C:/build\[1\]/file?.txt`},
+		{"escaped Unix path", `/build\[1\]`, "*.txt", `/build\[1\]/*.txt`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			is.New(t).Equal(tc.pattern, joinParentPattern(tc.prefix, tc.relative))
+		})
+	}
+}
+
 func TestStaticPrefix(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
@@ -21,6 +47,10 @@ func TestStaticPrefix(t *testing.T) {
 		{"./", "."},
 		{"fo\\*o/bar/b*z", "fo*o/bar"},
 		{"/\\{foo\\}/bar", "/{foo}/bar"},
+		{`/build\[1\]/*.txt`, "/build[1]"},
+		{`/build\[1\]/file.txt`, "/build[1]/file.txt"},
+		{`/build\[1\]/file\[1\].txt`, "/build[1]/file[1].txt"},
+		{`/build\\1/*.txt`, `/build\1`},
 		{"C:/Path/To/Some/File", "C:/Path/To/Some/File"},
 	}
 

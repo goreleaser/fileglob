@@ -60,31 +60,30 @@ func staticText(node *ast.Node) (text string, ok bool) {
 }
 
 // staticPrefix returns the file path inside the pattern up
-// to the first path element that contains a wildcard.
+// to the first path element that contains a glob matcher.
 func staticPrefix(pattern string) (string, error) {
-	parts := strings.Split(pattern, separatorString)
+	rootNode, err := ast.Parse(lexer.NewLexer(pattern))
+	if err != nil {
+		return "", fmt.Errorf("parse glob pattern: %w", err)
+	}
 
-	//nolint:prealloc
-	var prefixPath []string
-	for _, part := range parts {
-		if part == "" {
-			continue
-		}
-
-		rootNode, err := ast.Parse(lexer.NewLexer(part))
-		if err != nil {
-			return "", fmt.Errorf("parse glob pattern: %w", err)
-		}
-
-		staticPart, ok := staticText(rootNode)
+	var prefix string
+	for _, child := range rootNode.Children {
+		text, ok := staticText(child)
 		if !ok {
+			// Only complete path components before the first matcher are static.
+			prefix = prefix[:strings.LastIndex(prefix, separatorString)+1]
 			break
 		}
 
-		prefixPath = append(prefixPath, staticPart)
+		prefix += text
 	}
-	prefix := strings.Join(prefixPath, separatorString)
-	if len(pattern) > 0 && rune(pattern[0]) == separatorRune && !strings.HasPrefix(prefix, separatorString) {
+
+	rooted := strings.HasPrefix(prefix, separatorString)
+	prefix = strings.Join(strings.FieldsFunc(prefix, func(r rune) bool {
+		return r == separatorRune
+	}), separatorString)
+	if rooted {
 		prefix = separatorString + prefix
 	}
 

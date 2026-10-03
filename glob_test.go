@@ -10,11 +10,83 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/caarlos0/testfs"
 	"github.com/gobwas/glob"
 	"github.com/matryer/is"
 )
+
+func TestGlobRootPatterns(t *testing.T) {
+	t.Parallel()
+
+	root := "/"
+	if isWindows() {
+		root = "C:/"
+	}
+	contents := []string{"a.txt", "sub/b.txt"}
+	rootContents := []string{root + "a.txt", root + "sub/b.txt"}
+	testCases := []struct {
+		name           string
+		pattern        string
+		explicitRootFS bool
+		contents       []string
+		direct         []string
+	}{
+		{"empty", "", false, nil, nil},
+		{"empty with rootfs", "", true, nil, nil},
+		{"dot", ".", false, contents, []string{"."}},
+		{"dot slash", "./", false, contents, []string{"."}},
+		{"relative dot slash", "././", false, contents, []string{"."}},
+		{"absolute root", root, false, rootContents, []string{root}},
+		{"absolute root with rootfs", root, true, rootContents, []string{root}},
+		{"absolute root dot", root + ".", false, rootContents, []string{root}},
+		{"absolute root dot slash", root + "./", false, rootContents, []string{root}},
+		{"absolute wildcard", root + "*", false, rootContents, []string{root, root + "a.txt", root + "sub"}},
+		{"relative wildcard", "./*", false, contents, []string{".", "a.txt", "sub"}},
+		{"relative directory", "sub", false, []string{"sub/b.txt"}, []string{"sub"}},
+		{"relative directory slash", "sub/", false, []string{"sub/b.txt"}, []string{"sub"}},
+		{"relative prefix directory", "./sub", false, []string{"sub/b.txt"}, []string{"sub"}},
+		{"relative prefix directory slash", "./sub/", false, []string{"sub/b.txt"}, []string{"sub"}},
+		{"relative file slash", "./a.txt/", false, []string{"a.txt"}, []string{"a.txt"}},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			for _, mode := range []struct {
+				name string
+				opts []OptFunc
+				want []string
+			}{
+				{"default", nil, testCase.contents},
+				{"includes contents", []OptFunc{MatchDirectoryIncludesContents}, testCase.contents},
+				{"as file", []OptFunc{MatchDirectoryAsFile}, testCase.direct},
+			} {
+				t.Run(mode.name, func(t *testing.T) {
+					t.Parallel()
+					is := is.New(t)
+					fsys := fstest.MapFS{
+						"a.txt":     {},
+						"sub/b.txt": {},
+					}
+					var opts []OptFunc
+					if testCase.explicitRootFS {
+						opts = append(opts, MaybeRootFS)
+					}
+					opts = append(opts, func(opts *globOptions) {
+						// Preserve the selected root prefix; WithFs would reset it.
+						opts.fs = fsys
+					})
+					opts = append(opts, mode.opts...)
+
+					matches, err := Glob(testCase.pattern, opts...)
+					is.NoErr(err)
+					is.Equal(mode.want, matches)
+				})
+			}
+		})
+	}
+}
 
 func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 	t.Parallel()

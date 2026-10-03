@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/caarlos0/testfs"
 	"github.com/gobwas/glob"
@@ -580,6 +581,286 @@ func TestQuoteMeta(t *testing.T) {
 	is.Equal([]string{
 		"{a,b}/c",
 	}, matches)
+}
+
+func TestGlobSymlinksWithFs(t *testing.T) {
+	is := is.New(t)
+	t.Chdir(t.TempDir())
+	is.NoErr(os.Symlink("missing", "link"))
+
+	for _, mode := range []struct {
+		name string
+		opts []OptFunc
+		want []string
+	}{
+		{"default", nil, []string{"link/data.txt"}},
+		{"contents", []OptFunc{MatchDirectoryIncludesContents}, []string{"link/data.txt"}},
+		{"directory", []OptFunc{MatchDirectoryAsFile}, []string{"link"}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			t.Run("missing", func(t *testing.T) {
+				is := is.New(t)
+				opts := append([]OptFunc{WithFs(fstest.MapFS{})}, mode.opts...)
+				matches, err := Glob("link", opts...)
+				is.True(errors.Is(err, fs.ErrNotExist))
+				is.Equal([]string{}, matches)
+			})
+			t.Run("virtual directory", func(t *testing.T) {
+				is := is.New(t)
+				opts := append([]OptFunc{WithFs(fstest.MapFS{
+					"link/data.txt": {Data: []byte("virtual")},
+				})}, mode.opts...)
+				matches, err := Glob("link", opts...)
+				is.NoErr(err)
+				is.Equal(mode.want, matches)
+			})
+			t.Run("absolute host link", func(t *testing.T) {
+				is := is.New(t)
+				absolute, err := filepath.Abs("link")
+				is.NoErr(err)
+				opts := append([]OptFunc{WithFs(fstest.MapFS{})}, mode.opts...)
+				matches, err := Glob(toNixPath(absolute), opts...)
+				is.True(errors.Is(err, fs.ErrNotExist))
+				is.Equal([]string{}, matches)
+
+				opts = append([]OptFunc{WithFs(os.DirFS("."))}, mode.opts...)
+				matches, err = Glob(toNixPath(absolute), opts...)
+				is.True(errors.Is(err, fs.ErrInvalid))
+				is.Equal(nil, matches)
+			})
+		})
+	}
+}
+
+func TestGlobLiteralSymlinks(t *testing.T) {
+	is := is.New(t)
+	root := t.TempDir()
+	t.Chdir(root)
+	is.NoErr(os.Mkdir("target", 0o755))
+	is.NoErr(os.WriteFile("target/data.txt", []byte("data"), 0o644))
+	is.NoErr(os.Symlink("target", "directory"))
+	is.NoErr(os.Symlink("target/data.txt", "file"))
+	is.NoErr(os.Symlink("missing", "broken"))
+	is.NoErr(os.Symlink("missing", "{broken}"))
+
+	for _, mode := range []struct {
+		name string
+		opts []OptFunc
+	}{
+		{"default", nil},
+		{"contents", []OptFunc{MatchDirectoryIncludesContents}},
+		{"directory", []OptFunc{MatchDirectoryAsFile}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			for _, testCase := range []struct {
+				name    string
+				pattern string
+				want    string
+				opts    []OptFunc
+			}{
+				{"directory", "directory", "directory", nil},
+				{"file", "file", "file", nil},
+				{"broken", "broken", "broken", nil},
+				{"quoted", "{broken}", "{broken}", []OptFunc{QuoteMeta}},
+				{"escaped", "\\{broken\\}", "{broken}", nil},
+			} {
+				t.Run(testCase.name, func(t *testing.T) {
+					for _, source := range []struct {
+						name    string
+						pattern string
+						want    string
+						opts    []OptFunc
+					}{
+						{"relative", testCase.pattern, testCase.want, nil},
+						{"dirfs", testCase.pattern, testCase.want, []OptFunc{WithFs(os.DirFS(root))}},
+						{
+							"absolute",
+							toNixPath(root) + "/" + testCase.pattern,
+							toNixPath(filepath.Join(root, testCase.want)),
+							nil,
+						},
+						{
+							"rootfs",
+							toNixPath(root) + "/" + testCase.pattern,
+							toNixPath(filepath.Join(root, testCase.want)),
+							[]OptFunc{MaybeRootFS},
+						},
+					} {
+						t.Run(source.name, func(t *testing.T) {
+							is := is.New(t)
+							opts := append([]OptFunc{}, mode.opts...)
+							opts = append(opts, source.opts...)
+							opts = append(opts, testCase.opts...)
+							matches, err := Glob(source.pattern, opts...)
+							is.NoErr(err)
+							is.Equal([]string{source.want}, matches)
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestGlobSymlinkMatchers(t *testing.T) {
+	for _, pattern := range []string{"*", "?", "{a,b}", "[ab]"} {
+		t.Run(pattern, func(t *testing.T) {
+			if isWindows() && (pattern == "*" || pattern == "?") {
+				t.Skip("can't create paths with * or ? on Windows")
+			}
+			is := is.New(t)
+			t.Chdir(t.TempDir())
+			is.NoErr(os.Mkdir("a", 0o755))
+			is.NoErr(os.WriteFile("a/data.txt", []byte("data"), 0o644))
+			is.NoErr(os.WriteFile("b", []byte("data"), 0o644))
+			is.NoErr(os.Symlink("a", pattern))
+
+			for _, mode := range []struct {
+				name string
+				opts []OptFunc
+				want []string
+			}{
+				{"default", nil, []string{"a/data.txt", "b"}},
+				{"contents", []OptFunc{MatchDirectoryIncludesContents}, []string{"a/data.txt", "b"}},
+				{"directory", []OptFunc{MatchDirectoryAsFile}, []string{"a", "b"}},
+			} {
+				t.Run(mode.name, func(t *testing.T) {
+					is := is.New(t)
+					want := mode.want
+					if pattern == "*" || pattern == "?" {
+						want = append([]string{pattern}, want...)
+						if mode.name == "directory" {
+							want = append([]string{"."}, want...)
+						}
+					}
+					matches, err := Glob(pattern, mode.opts...)
+					is.NoErr(err)
+					is.Equal(want, matches)
+
+					opts := append([]OptFunc{QuoteMeta}, mode.opts...)
+					matches, err = Glob(pattern, opts...)
+					is.NoErr(err)
+					is.Equal([]string{pattern}, matches)
+				})
+			}
+		})
+	}
+}
+
+func TestGlobSymlinkFS(t *testing.T) {
+	t.Parallel()
+	fsys := fstest.MapFS{
+		"target/data.txt": {Data: []byte("virtual")},
+		"link":            {Mode: fs.ModeSymlink, Data: []byte("target")},
+		"broken":          {Mode: fs.ModeSymlink, Data: []byte("missing")},
+		"{broken}":        {Mode: fs.ModeSymlink, Data: []byte("missing")},
+	}
+	for _, mode := range []struct {
+		name string
+		opts []OptFunc
+	}{
+		{"default", nil},
+		{"contents", []OptFunc{MatchDirectoryIncludesContents}},
+		{"directory", []OptFunc{MatchDirectoryAsFile}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			t.Parallel()
+			for _, testCase := range []struct {
+				pattern string
+				want    []string
+				err     error
+			}{
+				{"link", []string{"link"}, nil},
+				{"link/*", []string{"link/data.txt"}, nil},
+				{"broken", []string{"broken"}, nil},
+				{"broken/*", []string{}, nil},
+				{"\\{broken\\}", []string{"{broken}"}, nil},
+				{"missing", []string{}, fs.ErrNotExist},
+				{"\\{missing\\}", []string{}, fs.ErrNotExist},
+			} {
+				t.Run(testCase.pattern, func(t *testing.T) {
+					t.Parallel()
+					is := is.New(t)
+					opts := append([]OptFunc{WithFs(fsys)}, mode.opts...)
+					matches, err := Glob(testCase.pattern, opts...)
+					is.True(errors.Is(err, testCase.err))
+					is.Equal(testCase.want, matches)
+				})
+			}
+
+			t.Run("lstat error", func(t *testing.T) {
+				t.Parallel()
+				is := is.New(t)
+				opts := append([]OptFunc{WithFs(lstatErrorFS{fsys})}, mode.opts...)
+				matches, err := Glob("link", opts...)
+				is.True(errors.Is(err, fs.ErrPermission))
+				is.Equal(nil, matches)
+			})
+		})
+	}
+}
+
+func TestGlobNativeAbsoluteSymlinks(t *testing.T) {
+	t.Parallel()
+	if !isWindows() {
+		t.Skip("native Windows path separators")
+	}
+	is := is.New(t)
+	root := t.TempDir()
+	is.NoErr(os.Mkdir(filepath.Join(root, "target"), 0o755))
+	is.NoErr(os.WriteFile(filepath.Join(root, "target", "data.txt"), []byte("data"), 0o644))
+	is.NoErr(os.Symlink("target", filepath.Join(root, "directory")))
+	is.NoErr(os.Symlink("missing", filepath.Join(root, "broken")))
+	is.NoErr(os.Symlink("missing", filepath.Join(root, "[ab]")))
+	is.NoErr(os.WriteFile(filepath.Join(root, "a"), []byte("a"), 0o644))
+	is.NoErr(os.WriteFile(filepath.Join(root, "b"), []byte("b"), 0o644))
+
+	for _, mode := range []struct {
+		name string
+		opts []OptFunc
+	}{
+		{"default", nil},
+		{"contents", []OptFunc{MaybeRootFS, MatchDirectoryIncludesContents}},
+		{"directory", []OptFunc{MaybeRootFS, MatchDirectoryAsFile}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			t.Parallel()
+			for _, name := range []string{"directory", "broken"} {
+				t.Run(name, func(t *testing.T) {
+					t.Parallel()
+					is := is.New(t)
+					pattern := filepath.Join(root, name)
+					matches, err := Glob(pattern, mode.opts...)
+					is.NoErr(err)
+					is.Equal([]string{pattern}, matches)
+
+					opts := append([]OptFunc{}, mode.opts...)
+					opts = append(opts, WithFs(fstest.MapFS{}))
+					matches, err = Glob(pattern, opts...)
+					is.True(errors.Is(err, fs.ErrNotExist))
+					is.Equal([]string{}, matches)
+				})
+			}
+			t.Run("dynamic", func(t *testing.T) {
+				t.Parallel()
+				is := is.New(t)
+				matches, err := Glob(filepath.Join(root, "[ab]"), mode.opts...)
+				is.NoErr(err)
+				is.Equal([]string{
+					toNixPath(filepath.Join(root, "a")),
+					toNixPath(filepath.Join(root, "b")),
+				}, matches)
+			})
+		})
+	}
+}
+
+type lstatErrorFS struct {
+	fs.ReadLinkFS
+}
+
+func (lstatErrorFS) Lstat(name string) (fs.FileInfo, error) {
+	return nil, &fs.PathError{Op: "lstat", Path: name, Err: fs.ErrPermission}
 }
 
 func testFs(tb testing.TB, files, dirs []string) fs.FS {

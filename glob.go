@@ -121,7 +121,15 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 
 	options := compileOptions(opts, pattern)
 
-	pattern = strings.TrimSuffix(strings.TrimPrefix(options.pattern, options.prefix), separatorString)
+	pattern = options.pattern
+	patternPrefix := options.prefix
+	nativePath := filepath.Separator == '\\' && options.prefix != "./" &&
+		strings.HasPrefix(pattern, filepath.FromSlash(options.prefix))
+	if nativePath {
+		pattern = filepath.ToSlash(pattern)
+		patternPrefix = filepath.ToSlash(patternPrefix)
+	}
+	pattern = strings.TrimSuffix(strings.TrimPrefix(pattern, patternPrefix), separatorString)
 	matcher, err := glob.Compile(pattern, separatorRune)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
@@ -132,17 +140,16 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 		return nil, fmt.Errorf("cannot determine static prefix: %w", err)
 	}
 
-	// Check if the file is valid symlink without following it
-	// It works only for valid absolut or relative file paths, in other words, will fail for WithFs() option
-	if patternInfo, err := os.Lstat(options.pattern); err == nil {
-		if patternInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
-			return []string{strings.TrimPrefix(options.pattern, "./")}, nil
-		}
-	}
+	hasMatchers := ContainsMatchers(pattern)
 
-	prefixInfo, err := fs.Stat(options.fs, prefix)
+	var prefixInfo fs.FileInfo
+	if hasMatchers {
+		prefixInfo, err = fs.Stat(options.fs, prefix)
+	} else {
+		prefixInfo, err = fs.Lstat(options.fs, prefix)
+	}
 	if errors.Is(err, fs.ErrNotExist) {
-		if !ContainsMatchers(pattern) {
+		if !hasMatchers {
 			// glob contains no dynamic matchers so prefix is the file name that
 			// the glob references directly. When the glob explicitly references
 			// a single non-existing file, return an error for the user to check.
@@ -159,6 +166,10 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 		// if the prefix is a file, it either has to be
 		// the only match, or nothing matches at all
 		if matcher.Match(prefix) {
+			// Keep the caller's native Windows spelling for literal symlinks.
+			if nativePath && prefixInfo.Mode()&fs.ModeSymlink != 0 {
+				return []string{options.pattern}, nil
+			}
 			return cleanFilepaths([]string{prefix}, options.prefix), nil
 		}
 

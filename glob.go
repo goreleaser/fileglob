@@ -10,6 +10,9 @@ import (
 	"strings"
 
 	"github.com/gobwas/glob"
+	"github.com/gobwas/glob/compiler"
+	"github.com/gobwas/glob/match"
+	"github.com/gobwas/glob/syntax"
 )
 
 const (
@@ -122,10 +125,15 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 	options := compileOptions(opts, pattern)
 
 	pattern = strings.TrimSuffix(strings.TrimPrefix(options.pattern, options.prefix), separatorString)
-	matcher, err := glob.Compile(pattern, separatorRune)
+	tree, err := syntax.Parse(pattern)
 	if err != nil {
 		return matches, fmt.Errorf("compile glob pattern: %w", err)
 	}
+	matcher, err := compiler.Compile(tree, []rune{separatorRune})
+	if err != nil {
+		return matches, fmt.Errorf("compile glob pattern: %w", err)
+	}
+	maxSeparators := maxPathSeparators(tree)
 
 	prefix, err := staticPrefix(pattern)
 	if err != nil {
@@ -165,6 +173,12 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 		return []string{}, nil
 	}
 
+	// A literal root match, including a collapsed alternative, needs no enumeration.
+	if literal, ok := matcher.(match.Text); ok && prefix == "." &&
+		options.matchDirectoriesDirectly && literal.Match(prefix) {
+		return cleanFilepaths([]string{prefix}, options.prefix), nil
+	}
+
 	if err := fs.WalkDir(options.fs, prefix, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -172,28 +186,27 @@ func Glob(pattern string, opts ...OptFunc) ([]string, error) { //nolint:funlen,c
 
 		// The glob ast from github.com/gobwas/glob only works properly with linux paths
 		path = toNixPath(path)
-		if !matcher.Match(path) {
-			return nil
+		if matcher.Match(path) {
+			if info.IsDir() && !options.matchDirectoriesDirectly {
+				// A matching directory includes all files inside, regardless of
+				// the depth of the original pattern.
+				filesInDir, err := filesInDirectory(options, path)
+				if err != nil {
+					return err
+				}
+
+				matches = append(matches, filesInDir...)
+				return fs.SkipDir
+			}
+
+			matches = append(matches, path)
 		}
 
-		if info.IsDir() {
-			if options.matchDirectoriesDirectly {
-				matches = append(matches, path)
-				return nil
-			}
-
-			// a direct match on a directory implies that all files inside
-			// match if options.matchFolders is false
-			filesInDir, err := filesInDirectory(options, path)
-			if err != nil {
-				return err
-			}
-
-			matches = append(matches, filesInDir...)
+		// The walk root "." adds no path component to its children.
+		if info.IsDir() && path != "." && maxSeparators >= 0 &&
+			strings.Count(path, separatorString) >= maxSeparators {
 			return fs.SkipDir
 		}
-
-		matches = append(matches, path)
 
 		return nil
 	}); err != nil {

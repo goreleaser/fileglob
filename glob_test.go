@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -565,6 +566,168 @@ func TestGlob(t *testing.T) { //nolint:funlen,maintidx
 				brokenSymlink,
 			}, matches)
 		})
+	})
+}
+
+func TestGlobParentPatterns(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		directory string
+		work      string
+		pattern   string
+		file      string
+		suffix    string
+		unixOnly  bool
+	}{
+		{"wildcard", "build[1]", "work", "../*.txt", "file.txt", "*.txt", false},
+		{"repeated parents", "build[1]", "work/deep", "../../*.txt", "file.txt", "*.txt", false},
+		{"parent directory", "build[1]", "work", "../", "file.txt", "", false},
+		{"repeated parent directory", "build[1]", "work/deep", "../..", "file.txt", "", false},
+		{"cleaned pattern", "build[1]", "work", "../unused/../*.txt", "file.txt", "*.txt", false},
+		{"direct file", "build[1]", "work", "../file.txt", "file.txt", "file.txt", false},
+		{"nested direct file", "build[1]", "work", "../data/file.txt", "data/file.txt", "data/file.txt", false},
+		{"user character class", "build[1]", "work", "../file[12].txt", "file1.txt", "file[12].txt", false},
+		{"user alternatives", "build[1]", "work", "../{file,other}.txt", "file.txt", "{file,other}.txt", false},
+		{"user escapes", "build[1]", "work", `../file\[1\].txt`, "file[1].txt", `file\[1\].txt`, false},
+		{"user directory matcher", "build[1]", "work", "../data[12]/file.txt", "data1/file.txt", "data[12]/file.txt", false},
+		{"user directory escapes", "build[1]", "work", `../data\[1\]/file.txt`, "data[1]/file.txt", `data\[1\]/file.txt`, false},
+		{"cwd alternatives", "build{1,2}", "work", "../*.txt", "file.txt", "*.txt", false},
+		{"cwd unmatched bracket", "build[", "work", "../*.txt", "file.txt", "*.txt", false},
+		{"cwd star", "build*", "work", "../*.txt", "file.txt", "*.txt", true},
+		{"cwd question mark", "build?", "work", "../*.txt", "file.txt", "*.txt", true},
+		{"cwd backslash", `build\1`, "work", "../*.txt", "file.txt", "*.txt", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.unixOnly && isWindows() {
+				t.Skip("filename contains characters unavailable on Windows")
+			}
+			is := is.New(t)
+			root := t.TempDir()
+			directory := filepath.Join(root, tc.directory)
+			work := filepath.Join(directory, tc.work)
+			decoy := filepath.Join(root, "build1")
+			is.NoErr(os.MkdirAll(work, 0o700))
+			is.NoErr(os.MkdirAll(filepath.Dir(filepath.Join(directory, tc.file)), 0o700))
+			is.NoErr(os.MkdirAll(filepath.Dir(filepath.Join(decoy, tc.file)), 0o700))
+			is.NoErr(os.WriteFile(filepath.Join(directory, tc.file), nil, 0o600))
+			is.NoErr(os.WriteFile(filepath.Join(decoy, tc.file), nil, 0o600))
+			is.NoErr(os.WriteFile(filepath.Join(decoy, "decoy.txt"), nil, 0o600))
+			t.Chdir(work)
+
+			absolute, err := filepath.Abs(filepath.FromSlash(strings.TrimSuffix(tc.pattern, tc.suffix)))
+			is.NoErr(err)
+			prefix := filepath.ToSlash(filepath.VolumeName(absolute)) + "/"
+			pattern := glob.QuoteMeta(filepath.ToSlash(absolute))
+			if tc.suffix != "" {
+				pattern += "/" + tc.suffix
+			}
+			var w bytes.Buffer
+			matches, err := Glob(tc.pattern, WriteOptions(&w))
+			is.NoErr(err)
+			is.Equal([]string{toNixPath(filepath.Join(absolute, tc.file))}, matches)
+			is.True(!slices.Contains(matches, toNixPath(filepath.Join(decoy, tc.file))))
+			is.True(!slices.Contains(matches, toNixPath(filepath.Join(decoy, "decoy.txt"))))
+			is.Equal(fmt.Sprintf(
+				"&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}",
+				prefix, prefix, pattern,
+			), w.String())
+
+			explicitMatches, err := Glob(tc.pattern, MaybeRootFS)
+			is.NoErr(err)
+			is.Equal(matches, explicitMatches)
+		})
+	}
+}
+
+func TestGlobParentPatternOptions(t *testing.T) {
+	is := is.New(t)
+	root := t.TempDir()
+	directory := filepath.Join(root, "build[1]")
+	work := filepath.Join(directory, "work")
+	decoy := filepath.Join(root, "build1")
+	is.NoErr(os.MkdirAll(work, 0o700))
+	is.NoErr(os.MkdirAll(decoy, 0o700))
+	is.NoErr(os.WriteFile(filepath.Join(directory, "{file}[1].txt"), nil, 0o600))
+	is.NoErr(os.WriteFile(filepath.Join(directory, "file1.txt"), nil, 0o600))
+	is.NoErr(os.WriteFile(filepath.Join(decoy, "{file}[1].txt"), nil, 0o600))
+	is.NoErr(os.WriteFile(filepath.Join(decoy, "file1.txt"), nil, 0o600))
+	t.Chdir(work)
+
+	absolute, err := filepath.Abs("..")
+	is.NoErr(err)
+	prefix := filepath.ToSlash(filepath.VolumeName(absolute)) + "/"
+	pattern := glob.QuoteMeta(filepath.ToSlash(absolute)) + "/{file}[1].txt"
+	quoted := glob.QuoteMeta(filepath.ToSlash(filepath.Join(absolute, "{file}[1].txt")))
+
+	t.Run("root before quote", func(t *testing.T) {
+		is := is.New(t)
+		var before, after bytes.Buffer
+		matches, err := Glob("../{file}[1].txt", MaybeRootFS, WriteOptions(&before), QuoteMeta, WriteOptions(&after))
+		is.NoErr(err)
+		is.True(!slices.Contains(matches, toNixPath(filepath.Join(decoy, "{file}[1].txt"))))
+		is.Equal([]string{toNixPath(filepath.Join(absolute, "{file}[1].txt"))}, matches)
+		is.Equal(fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, pattern), before.String())
+		is.Equal(fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, quoted), after.String())
+	})
+
+	t.Run("quote before root", func(t *testing.T) {
+		is := is.New(t)
+		var before, after bytes.Buffer
+		matches, err := Glob("../{file}[1].txt", QuoteMeta, WriteOptions(&before), MaybeRootFS, WriteOptions(&after))
+		is.NoErr(err)
+		is.True(!slices.Contains(matches, toNixPath(filepath.Join(decoy, "{file}[1].txt"))))
+		is.Equal([]string{toNixPath(filepath.Join(absolute, "{file}[1].txt"))}, matches)
+		is.Equal(fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, quoted), before.String())
+		is.Equal(fmt.Sprintf("&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s}", prefix, prefix, quoted), after.String())
+
+		defaultMatches, err := Glob("../{file}[1].txt", QuoteMeta)
+		is.NoErr(err)
+		is.Equal(matches, defaultMatches)
+	})
+
+	t.Run("missing direct file", func(t *testing.T) {
+		is := is.New(t)
+		matches, err := Glob("../missing.txt", MaybeRootFS)
+		is.True(errors.Is(err, fs.ErrNotExist))
+		is.Equal([]string{}, matches)
+		is.Equal(fmt.Sprintf("matching %q: file does not exist", toNixPath(filepath.Join(absolute, "missing.txt"))), err.Error())
+	})
+
+	fsys := testFs(t, []string{
+		strings.TrimPrefix(filepath.ToSlash(absolute), prefix) + "/virtual.txt",
+	}, nil)
+	t.Run("fs before root", func(t *testing.T) {
+		is := is.New(t)
+		var w bytes.Buffer
+		matches, err := Glob("../file1.txt", WithFs(fsys), MaybeRootFS, WriteOptions(&w))
+		is.NoErr(err)
+		is.Equal([]string{toNixPath(filepath.Join(absolute, "file1.txt"))}, matches)
+		is.Equal(fmt.Sprintf(
+			"&{fs:%s matchDirectoriesDirectly:false prefix:%s pattern:%s/file1.txt}",
+			prefix, prefix, glob.QuoteMeta(filepath.ToSlash(absolute)),
+		), w.String())
+	})
+
+	t.Run("fs after root resets prefix", func(t *testing.T) {
+		is := is.New(t)
+		var w bytes.Buffer
+		matches, err := Glob("../virtual.txt", MaybeRootFS, WithFs(fsys), WriteOptions(&w))
+		is.True(errors.Is(err, fs.ErrInvalid))
+		is.Equal(nil, matches)
+		is.Equal(fmt.Sprintf(
+			"&{fs:%+v matchDirectoriesDirectly:false prefix:./ pattern:%s/virtual.txt}",
+			fsys, glob.QuoteMeta(filepath.ToSlash(absolute)),
+		), w.String())
+	})
+
+	t.Run("fs uses relative patterns", func(t *testing.T) {
+		is := is.New(t)
+		pattern := strings.TrimPrefix(glob.QuoteMeta(filepath.ToSlash(absolute)), prefix) + "/virtual.txt"
+		matches, err := Glob(pattern, WithFs(fsys))
+		is.NoErr(err)
+		is.Equal([]string{
+			strings.TrimPrefix(toNixPath(filepath.Join(absolute, "virtual.txt")), prefix),
+		}, matches)
 	})
 }
 
